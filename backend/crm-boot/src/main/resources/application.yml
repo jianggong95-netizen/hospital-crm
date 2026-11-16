@@ -1,0 +1,160 @@
+spring:
+  application:
+    name: hospital-crm
+  profiles:
+    default: dev
+  datasource:
+    url: ${CRM_DB_URL:jdbc:postgresql://localhost:5432/crm}
+    username: ${CRM_DB_USERNAME:crm}
+    password: ${CRM_DB_PASSWORD:crm_dev_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: crm-pool
+      maximum-pool-size: ${CRM_DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 5000
+      validation-timeout: 3000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: ${CRM_SERVER_PORT:8080}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,application/javascript,text/css,text/html
+  error:
+    include-message: never
+    include-stacktrace: never
+    whitelabel:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      cors:
+        allowed-origins: ${CRM_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174}
+        allowed-methods: GET,OPTIONS
+        allowed-headers: "*"
+        exposed-headers: X-Trace-Id
+        allow-credentials: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: ${CRM_HEALTH_SHOW_DETAILS:always}
+      validate-group-membership: false
+      group:
+        readiness:
+          include: readinessState,db
+  info:
+    env:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+info:
+  app:
+    name: Hospital CRM API
+    version: ${crm.version}
+    description: 医院智慧客户服务与运营管理平台
+
+crm:
+  version: 1.0.0-SNAPSHOT
+  cors:
+    allowed-origins: ${CRM_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174}
+  security:
+    jwt:
+      issuer: hospital-crm
+      signing-key: ${CRM_JWT_SIGNING_KEY:}
+      access-token-minutes: ${CRM_JWT_ACCESS_MINUTES:15}
+      refresh-token-days: ${CRM_JWT_REFRESH_DAYS:7}
+    login:
+      max-failed-attempts: ${CRM_LOGIN_MAX_FAILED_ATTEMPTS:5}
+      lock-minutes: ${CRM_LOGIN_LOCK_MINUTES:15}
+    bootstrap-admin:
+      enabled: ${CRM_BOOTSTRAP_ADMIN_ENABLED:true}
+      username: ${CRM_BOOTSTRAP_ADMIN_USERNAME:admin}
+      password: ${CRM_BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${CRM_BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
+    data-encryption:
+      key: ${CRM_DATA_ENCRYPTION_KEY:}
+  patient360:
+    cache-ttl-seconds: ${CRM_PATIENT360_CACHE_TTL_SECONDS:60}
+    cache-max-entries: ${CRM_PATIENT360_CACHE_MAX_ENTRIES:500}
+    default-page-size: ${CRM_PATIENT360_DEFAULT_PAGE_SIZE:10}
+    max-page-size: ${CRM_PATIENT360_MAX_PAGE_SIZE:50}
+  his:
+    enabled: ${CRM_HIS_ENABLED:false}
+    url: ${CRM_HIS_URL:}
+    username: ${CRM_HIS_USERNAME:}
+    password: ${CRM_HIS_PASSWORD:}
+    driver-class-name: ${CRM_HIS_DRIVER:com.microsoft.sqlserver.jdbc.SQLServerDriver}
+    source-system: ${CRM_HIS_SOURCE_SYSTEM:HIS}
+    maximum-pool-size: ${CRM_HIS_POOL_SIZE:5}
+    minimum-idle: 1
+    connection-timeout-ms: ${CRM_HIS_CONNECTION_TIMEOUT_MS:3000}
+    query-timeout-seconds: ${CRM_HIS_QUERY_TIMEOUT_SECONDS:5}
+    search-limit: ${CRM_HIS_SEARCH_LIMIT:20}
+    detail-limit: ${CRM_HIS_DETAIL_LIMIT:20}
+    snapshot-valid-minutes: ${CRM_HIS_SNAPSHOT_VALID_MINUTES:30}
+    snapshot-max-stale-minutes: ${CRM_HIS_SNAPSHOT_MAX_STALE_MINUTES:1440}
+    read-only-check: ${CRM_HIS_READ_ONLY_CHECK:true}
+    circuit-breaker:
+      failure-threshold: ${CRM_HIS_BREAKER_FAILURE_THRESHOLD:5}
+      open-seconds: ${CRM_HIS_BREAKER_OPEN_SECONDS:30}
+      half-open-probes: ${CRM_HIS_BREAKER_HALF_OPEN_PROBES:1}
+    patient-view:
+      table: ${CRM_HIS_PATIENT_VIEW:dbo.v_crm_patient}
+      patient-id-column: ${CRM_HIS_PATIENT_ID_COLUMN:patient_id}
+      mrn-column: ${CRM_HIS_MRN_COLUMN:mrn}
+      name-column: ${CRM_HIS_NAME_COLUMN:patient_name}
+      gender-column: ${CRM_HIS_GENDER_COLUMN:gender}
+      birth-date-column: ${CRM_HIS_BIRTH_DATE_COLUMN:birth_date}
+      mobile-column: ${CRM_HIS_MOBILE_COLUMN:mobile}
+      id-no-column: ${CRM_HIS_ID_NO_COLUMN:id_no}
+    visit-view:
+      table: ${CRM_HIS_VISIT_VIEW:dbo.v_crm_visit}
+      patient-id-column: ${CRM_HIS_VISIT_PATIENT_ID_COLUMN:patient_id}
+      visit-id-column: ${CRM_HIS_VISIT_ID_COLUMN:visit_id}
+      visit-time-column: ${CRM_HIS_VISIT_TIME_COLUMN:visit_time}
+      department-column: ${CRM_HIS_VISIT_DEPARTMENT_COLUMN:department}
+      doctor-column: ${CRM_HIS_VISIT_DOCTOR_COLUMN:doctor_name}
+      diagnosis-column: ${CRM_HIS_VISIT_DIAGNOSIS_COLUMN:diagnosis}
+    admission-view:
+      table: ${CRM_HIS_ADMISSION_VIEW:dbo.v_crm_admission}
+      patient-id-column: ${CRM_HIS_ADMISSION_PATIENT_ID_COLUMN:patient_id}
+      admission-id-column: ${CRM_HIS_ADMISSION_ID_COLUMN:admission_id}
+      admitted-at-column: ${CRM_HIS_ADMISSION_ADMITTED_AT_COLUMN:admitted_at}
+      discharged-at-column: ${CRM_HIS_ADMISSION_DISCHARGED_AT_COLUMN:discharged_at}
+      ward-column: ${CRM_HIS_ADMISSION_WARD_COLUMN:ward}
+      diagnosis-column: ${CRM_HIS_ADMISSION_DIAGNOSIS_COLUMN:diagnosis}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-}] %logger{40} - %msg%n"

@@ -1,0 +1,2100 @@
+openapi: 3.1.0
+info:
+  title: Hospital CRM API
+  version: 1.0.0
+  description: 医院智慧客户服务与运营管理平台标准API基线。生产环境需补充医院确认的字段映射、权限和渠道回调协议。
+servers:
+  - url: https://crm.example.intranet/api/v1
+    description: 医院内网示例地址，部署时替换
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: System
+  - name: Customers
+  - name: Families
+  - name: HIS
+  - name: Service
+  - name: Orders
+  - name: Followups
+  - name: Chat
+  - name: Complaints
+  - name: Insurance
+paths:
+  /customers:
+    get:
+      tags: [Customers]
+      summary: 分页查询客户
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageCustomerResponse" }
+    post:
+      tags: [Customers]
+      summary: 创建CRM客户档案
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerResponse" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /customers/{customerId}:
+    get:
+      tags: [Customers]
+      summary: 获取客户详情
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      responses:
+        "200":
+          description: 客户详情
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /customers/{customerId}/360:
+    get:
+      tags: [Customers]
+      summary: 获取患者/客户360聚合视图
+      description: |
+        以 CRM 客户为主键聚合客户档案、标签、家庭归属与 HIS 诊疗摘要。
+        每个分区独立返回来源、状态、获取时间与有效期；HIS 不可用时返回 UNAVAILABLE
+        或带 STALE 标记的缓存快照，不补齐、不推测、不伪造诊疗数据。
+      x-required-permission: crm:patient360:read
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+        - in: query
+          name: include
+          description: 允许的聚合分区；未提供时返回全部已交付分区。分区仍需逐项授权。
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [visits, admissions, appointments, serviceOrders, followups, memberships, complaints]
+          style: form
+          explode: false
+        - in: query
+          name: visitPage
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: visitPageSize
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+        - in: query
+          name: admissionPage
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: admissionPageSize
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+        - in: query
+          name: refresh
+          description: 为 true 时跳过患者360的短时 HIS 缓存，但仍受 CRM-005 快照降级策略约束
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 360视图
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer360Response" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /families:
+    get:
+      tags: [Families]
+      summary: 分页查询家庭账户
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyPageResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Families]
+      summary: 创建家庭账户
+      description: 家庭管理员客户自动建立本人关系；同一客户同一时段默认只允许一个有效家庭。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyDetailResponse" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /families/{familyId}:
+    get:
+      tags: [Families]
+      summary: 家庭账户详情
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyDetailResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /families/{familyId}/members:
+    get:
+      tags: [Families]
+      summary: 家庭成员与关系历史
+      description: includeEnded=true 时返回已解除关系，用于关系历史追溯。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - in: query
+          name: includeEnded
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMemberListResponse" }
+    post:
+      tags: [Families]
+      summary: 添加家庭成员
+      description: 家庭关系仅表达家庭归属，不授予病历或临床数据访问权限。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyMemberCreate" }
+      responses:
+        "200":
+          description: 添加成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMemberResponse" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /families/{familyId}/members/{memberId}:
+    put:
+      tags: [Families]
+      summary: 更新家庭成员关系或管理员
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - $ref: "#/components/parameters/MemberId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyMemberUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMemberResponse" }
+    delete:
+      tags: [Families]
+      summary: 解除家庭成员关系
+      description: 逻辑结束关系并保留历史记录，同时撤销该成员全部生效中的代办授权。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - $ref: "#/components/parameters/MemberId"
+      responses:
+        "200":
+          description: 解除成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationResponse" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /families/{familyId}/members/{memberId}/authorizations:
+    get:
+      tags: [Families]
+      summary: 查询成员代办授权
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - $ref: "#/components/parameters/MemberId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthorizationListResponse" }
+    post:
+      tags: [Families]
+      summary: 创建代办授权
+      description: 代办范围仅限 appointment/payment/package_share/profile_update，病历与临床数据不可授权。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - $ref: "#/components/parameters/MemberId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyAuthorizationCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthorizationResponse" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /families/{familyId}/members/{memberId}/authorizations/{authorizationId}:
+    delete:
+      tags: [Families]
+      summary: 撤销代办授权
+      description: 撤销后该授权立即失效，后续代办接口必须拒绝访问。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+        - $ref: "#/components/parameters/MemberId"
+        - in: path
+          name: authorizationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 撤销成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthorizationResponse" }
+  /families/{familyId}/delegation-checks:
+    post:
+      tags: [Families]
+      summary: 代办权限校验
+      description: 供预约、支付等代办接口受理前调用；授权撤销、过期、关系解除或家庭停用时返回 403。
+      parameters:
+        - $ref: "#/components/parameters/FamilyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DelegationCheckRequest" }
+      responses:
+        "200":
+          description: 校验通过
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DelegationCheckResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /his/patients/search:
+    get:
+      tags: [HIS]
+      summary: 查询HIS患者候选记录
+      description: 只读查询；仅返回脱敏后的最小字段，候选必须人工核验后才能绑定到CRM客户。
+      x-required-permission: his:patient:read
+      parameters:
+        - in: query
+          name: keyword
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 100 }
+        - in: query
+          name: identityType
+          description: 省略时按关键字自动推断手机号/证件号，否则按通用关键字检索。
+          schema: { type: string, enum: [mobile, id_no, his_patient_id, mrn] }
+      responses:
+        "200":
+          description: 候选列表；需遵循最小化返回和人工核验原则
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HisPatientSearchResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /his/patients/{externalPatientId}/360:
+    get:
+      tags: [HIS]
+      summary: 获取HIS患者360摘要
+      description: HIS不可用且存在未过期快照时返回 STALE 数据，并明确标记来源、获取时间与有效期；不伪造数据。
+      x-required-permission: his:patient:read
+      parameters:
+        - in: path
+          name: externalPatientId
+          required: true
+          schema: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: HIS聚合摘要（LIVE）或降级快照（STALE）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/His360Response" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /his/patients/{externalPatientId}/link:
+    post:
+      tags: [HIS]
+      summary: 人工核验后绑定HIS患者主索引
+      description: 仅允许已核验的HIS患者绑定到CRM客户；同一外部标识只能绑定一个客户。
+      x-required-permission: his:patient:link
+      parameters:
+        - in: path
+          name: externalPatientId
+          required: true
+          schema: { type: string, maxLength: 100 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HisPatientLinkRequest" }
+      responses:
+        "200":
+          description: 绑定成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HisPatientLinkResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /his/sync-logs:
+    get:
+      tags: [HIS]
+      summary: 分页查询HIS同步日志
+      description: 用于查询审计与运维排障；不返回查询关键字等敏感明文。
+      x-required-permission: his:patient:read
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [SUCCESS, FAILED, DEGRADED] }
+        - in: query
+          name: operation
+          schema: { type: string, maxLength: 80 }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: 同步日志分页结果
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HisSyncLogPageResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /service-catalog:
+    get:
+      tags: [Service]
+      summary: 查询可预约服务目录
+      parameters:
+        - in: query
+          name: serviceType
+          schema: { type: string, enum: [escort, home_service] }
+      responses:
+        "200":
+          description: 服务目录
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceCatalogResponse" }
+  /staff/availability:
+    get:
+      tags: [Service]
+      summary: 查询服务人员可用时段
+      parameters:
+        - in: query
+          name: serviceCode
+          required: true
+          schema: { type: string }
+        - in: query
+          name: startAt
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: durationMinutes
+          required: true
+          schema: { type: integer, minimum: 30, maximum: 1440 }
+      responses:
+        "200":
+          description: 可用人员与时段
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AvailabilityResponse" }
+  /service-orders:
+    post:
+      tags: [Service]
+      summary: 创建陪诊或上门服务订单
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ServiceOrderCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceOrderResponse" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /service-orders/{serviceOrderId}/accept:
+    post:
+      tags: [Service]
+      summary: 服务人员接单
+      parameters:
+        - in: path
+          name: serviceOrderId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 接单成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceOrderResponse" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /service-orders/{serviceOrderId}/complete:
+    post:
+      tags: [Service]
+      summary: 完成服务
+      parameters:
+        - in: path
+          name: serviceOrderId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completionNote]
+              properties:
+                completionNote: { type: string, maxLength: 4000 }
+                patientConfirmed: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 服务完成
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceOrderResponse" }
+  /orders:
+    post:
+      tags: [Orders]
+      summary: 创建CRM收费订单
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderCreate" }
+      responses:
+        "201":
+          description: 订单创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderResponse" }
+  /orders/{orderId}/payments:
+    post:
+      tags: [Orders]
+      summary: 发起支付
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel]
+              properties:
+                channel: { type: string, enum: [wechat_pay, alipay, offline] }
+                returnUrl: { type: string, format: uri }
+      responses:
+        "201":
+          description: 支付单创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentResponse" }
+  /followup/tasks:
+    post:
+      tags: [Followups]
+      summary: 创建随访任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, categoryCode, plannedAt, channel]
+              properties:
+                customerId: { type: string, format: uuid }
+                categoryCode: { type: string }
+                plannedAt: { type: string, format: date-time }
+                channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+      responses:
+        "201": { description: 创建成功 }
+  /chat/sessions/{sessionId}/handoff:
+    post:
+      tags: [Chat]
+      summary: 请求转人工客服
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+                forceHandoff: { type: boolean, default: false }
+      responses:
+        "202":
+          description: 已进入人工队列或排队
+  /complaints:
+    post:
+      tags: [Complaints]
+      summary: 创建投诉/表扬工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, ticketType, subject, description]
+              properties:
+                customerId: { type: string, format: uuid }
+                ticketType: { type: string, enum: [complaint, praise, suggestion] }
+                severity: { type: string, enum: [low, normal, high, urgent] }
+                subject: { type: string, maxLength: 200 }
+                description: { type: string, maxLength: 10000 }
+      responses:
+        "201": { description: 工单创建成功 }
+  /insurance/cases:
+    post:
+      tags: [Insurance]
+      summary: 创建商保案件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, insurerCode, policyNo]
+              properties:
+                customerId: { type: string, format: uuid }
+                insurerCode: { type: string }
+                policyNo: { type: string }
+                caseMode: { type: string, enum: [api, email, manual] }
+      responses:
+        "201": { description: 案件创建成功 }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 账号密码登录
+      description: 校验账号密码，失败达到阈值后锁定；成功后返回访问令牌与刷新令牌。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新令牌轮换
+      description: 刷新令牌一次性使用；检测到已轮换令牌被复用时，撤销该用户全部刷新令牌。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: 刷新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 退出登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200": { description: 已退出，刷新令牌失效 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: 当前登录用户
+      responses:
+        "200":
+          description: 当前用户、角色、权限与数据范围
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserSessionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /system/users:
+    get:
+      tags: [System]
+      summary: 分页查询用户
+      description: 需要 system:user:read；结果按当前用户数据范围过滤。
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: orgId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageUserResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [System]
+      summary: 创建用户
+      description: 需要 system:user:write；不得分配超出操作人权限范围的角色。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserResponse" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /system/users/{userId}:
+    put:
+      tags: [System]
+      summary: 更新用户
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /system/users/{userId}/status:
+    patch:
+      tags: [System]
+      summary: 启用或停用用户
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200": { description: 状态已更新 }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /system/users/{userId}/reset-password:
+    post:
+      tags: [System]
+      summary: 重置用户密码
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 8, maxLength: 64 }
+      responses:
+        "200": { description: 密码已重置，该用户全部刷新令牌失效 }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /system/orgs/tree:
+    get:
+      tags: [System]
+      summary: 查询组织树
+      description: 需要 system:org:read；非全院数据范围仅返回可见组织及其祖先。
+      responses:
+        "200":
+          description: 组织树
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrgTreeResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /system/orgs:
+    post:
+      tags: [System]
+      summary: 创建组织
+      description: 需要 system:org:write；只能在数据范围内组织下创建。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrgCreate" }
+      responses:
+        "200": { description: 创建成功 }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /system/orgs/{orgId}:
+    put:
+      tags: [System]
+      summary: 更新组织
+      parameters:
+        - in: path
+          name: orgId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrgUpdate" }
+      responses:
+        "200": { description: 更新成功 }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /system/roles:
+    get:
+      tags: [System]
+      summary: 查询角色列表
+      description: 需要 system:role:read。
+      responses:
+        "200":
+          description: 角色列表
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleListResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [System]
+      summary: 创建角色
+      description: 需要 system:role:write；不能授予超出自身权限的权限项。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /system/roles/{roleId}:
+    put:
+      tags: [System]
+      summary: 更新角色
+      description: 内置 SUPER_ADMIN 角色不允许修改。
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoleUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /system/permissions:
+    get:
+      tags: [System]
+      summary: 查询权限字典
+      description: 需要 system:permission:read；按模块分组返回。
+      responses:
+        "200":
+          description: 权限分组
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PermissionGroupListResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /system/audit-logs:
+    get:
+      tags: [System]
+      summary: 分页查询审计日志
+      description: 需要 system:audit:read；按当前用户数据范围过滤操作人所属组织。
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: action
+          schema: { type: string, maxLength: 80 }
+        - in: query
+          name: resourceType
+          schema: { type: string, maxLength: 80 }
+        - in: query
+          name: actorUserId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageAuditLogResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /customers:
+    get:
+      tags: [Customers]
+      summary: 分页查询客户档案
+      description: 需要 crm:customer:read；手机号/证件号仅返回脱敏值，检索手机号或证件号时按 HMAC 哈希精确匹配。
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+          description: 姓名/客户号模糊匹配；11 位手机号或 15/18 位身份证号按哈希精确匹配
+        - in: query
+          name: tagId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: sourceCode
+          schema: { type: string, maxLength: 32 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+        - in: query
+          name: gender
+          schema: { type: string, enum: [unknown, male, female] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageCustomerResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Customers]
+      summary: 创建客户档案
+      description: 需要 crm:customer:write；手机号与证件号加密存储并计算检索哈希，重复时返回 409，可显式强制创建。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerCreate" }
+      responses:
+        "200":
+          description: 创建成功，响应仅包含脱敏字段
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerSummaryResponse" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /customers/{customerId}:
+    get:
+      tags: [Customers]
+      summary: 查询客户档案详情
+      description: 需要 crm:customer:read；拥有 crm:customer:sensitive:read 时返回解密后的完整手机号与证件号，并写入敏感查看审计。
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerDetailResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Customers]
+      summary: 更新客户档案
+      description: 需要 crm:customer:write；phone/idNo 传空字符串表示清空，缺省表示保持不变。
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerSummaryResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /customers/{customerId}/status:
+    patch:
+      tags: [Customers]
+      summary: 启用或停用客户档案
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200": { description: 状态已更新 }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /tags:
+    get:
+      tags: [Customers]
+      summary: 查询客户标签字典
+      description: 需要 crm:tag:read。
+      parameters:
+        - in: query
+          name: includeDisabled
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 标签列表
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagListResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Customers]
+      summary: 创建客户标签
+      description: 需要 crm:tag:write。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagItemResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /tags/{tagId}:
+    put:
+      tags: [Customers]
+      summary: 更新客户标签
+      description: 需要 crm:tag:write；停用标签不再可用于新分配。
+      parameters:
+        - in: path
+          name: tagId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagItemResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CustomerId:
+      in: path
+      name: customerId
+      required: true
+      schema: { type: string, format: uuid }
+    FamilyId:
+      in: path
+      name: familyId
+      required: true
+      schema: { type: string, format: uuid }
+    MemberId:
+      in: path
+      name: memberId
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 100 }
+  responses:
+    Conflict:
+      description: 状态冲突或重复请求
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    UpstreamError:
+      description: 上游HIS或第三方服务错误
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    BusinessRuleFailed:
+      description: 业务规则不满足
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Unauthorized:
+      description: 未认证或登录已过期
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: 权限不足或超出数据范围
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ServiceUnavailable:
+      description: HIS未配置、只读账号校验失败或服务熔断
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationFailed:
+      description: 请求参数校验失败
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message, traceId, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: array, items: { type: object, additionalProperties: true } }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    CustomerCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+        gender: { type: string, enum: [unknown, male, female, other] }
+        birthDate: { type: string, format: date }
+        mobile: { type: string, description: "服务端加密存储并生成检索hash" }
+        identityNo: { type: string, description: "敏感字段，服务端加密处理" }
+        sourceCode: { type: string }
+    CustomerResponse:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            customerNo: { type: string }
+            name: { type: string }
+            phoneMasked: { type: string }
+            status: { type: string }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    PageCustomerResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { type: object, additionalProperties: true } }
+            page: { type: integer }
+            pageSize: { type: integer }
+            total: { type: integer }
+        traceId: { type: string }
+    Customer360Response:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          required: [customer, sensitiveVisible, family, his, dataSources]
+          properties:
+            customer: { $ref: "#/components/schemas/CustomerDetail" }
+            sensitiveVisible:
+              type: boolean
+              description: 是否返回完整手机号/证件号，由 crm:customer:sensitive:read 控制
+            family: { $ref: "#/components/schemas/Patient360FamilySection" }
+            his: { $ref: "#/components/schemas/Patient360HisSection" }
+            dataSources:
+              type: array
+              items: { $ref: "#/components/schemas/Patient360DataSource" }
+            unavailableSections:
+              type: array
+              description: 请求中包含但当前版本尚未交付的分区
+              items: { type: string }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    Patient360FamilySection:
+      type: object
+      properties:
+        dataStatus:
+          type: string
+          enum: [LIVE, NOT_FOUND, RESTRICTED]
+        message: { type: string }
+        family:
+          type: object
+          nullable: true
+          properties:
+            familyId: { type: string, format: uuid }
+            familyNo: { type: string }
+            familyName: { type: string }
+            familyStatus: { type: string, enum: [active, disabled] }
+            relationshipCode: { type: string }
+            relationshipLabel: { type: string }
+            admin: { type: boolean }
+            memberCount: { type: integer }
+            validFrom: { type: string, format: date-time }
+    Patient360HisSection:
+      type: object
+      properties:
+        dataStatus:
+          type: string
+          description: LIVE/STALE 为有数据；UNAVAILABLE/NOT_LINKED/RESTRICTED/NOT_REQUESTED 均不包含诊疗数据
+          enum: [LIVE, STALE, UNAVAILABLE, NOT_LINKED, RESTRICTED, NOT_REQUESTED]
+        message: { type: string }
+        sourceSystem: { type: string }
+        externalPatientIdMasked: { type: string }
+        patientNameMasked: { type: string }
+        mrn: { type: string }
+        gender: { type: string }
+        birthDate: { type: string, format: date }
+        mobileMasked: { type: string }
+        fetchedAt: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        stale: { type: boolean }
+        cached: { type: boolean, description: 是否命中患者360短时缓存 }
+        matchConfidence: { type: number }
+        requiresManualVerification: { type: boolean }
+        visits:
+          type: object
+          nullable: true
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Patient360Visit" }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        admissions:
+          type: object
+          nullable: true
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Patient360Admission" }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        errorCode: { type: string }
+    Patient360Visit:
+      type: object
+      properties:
+        visitId: { type: string }
+        visitTime: { type: string, format: date-time }
+        department: { type: string }
+        doctor: { type: string }
+        diagnosis: { type: string }
+    Patient360Admission:
+      type: object
+      properties:
+        admissionId: { type: string }
+        admittedAt: { type: string, format: date-time }
+        dischargedAt: { type: string, format: date-time }
+        ward: { type: string }
+        diagnosis: { type: string }
+    Patient360DataSource:
+      type: object
+      properties:
+        section: { type: string, enum: [profile, family, his] }
+        sourceSystem: { type: string, enum: [CRM, HIS] }
+        dataStatus:
+          type: string
+          enum: [LIVE, STALE, UNAVAILABLE, NOT_LINKED, RESTRICTED, NOT_FOUND, NOT_REQUESTED]
+        fetchedAt: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        cached: { type: boolean }
+        message: { type: string }
+    CustomerSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        customerNo: { type: string }
+        name: { type: string }
+        phoneMasked: { type: string }
+    FamilyCreate:
+      type: object
+      required: [familyName, ownerCustomerId]
+      properties:
+        familyName: { type: string, maxLength: 100 }
+        ownerCustomerId: { type: string, format: uuid }
+    CustomerBrief:
+      type: object
+      description: 其他模块引用的客户简要信息，仅含脱敏手机号
+      properties:
+        id: { type: string, format: uuid }
+        customerNo: { type: string }
+        name: { type: string }
+        phoneMasked: { type: string }
+        status: { type: string, enum: [active, disabled] }
+    FamilySummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        familyNo: { type: string }
+        familyName: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        memberCount: { type: integer }
+        adminName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FamilyMemberItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        familyId: { type: string, format: uuid }
+        customer: { $ref: "#/components/schemas/CustomerBrief" }
+        relationshipCode:
+          type: string
+          enum: [self, spouse, parent, child, sibling, grandparent, grandchild, other]
+        relationshipLabel: { type: string }
+        admin: { type: boolean }
+        status: { type: string, enum: [active, ended] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: string, format: date-time, nullable: true }
+    FamilyDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        familyNo: { type: string }
+        familyName: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/FamilyMemberItem" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FamilyMemberCreate:
+      type: object
+      required: [customerId, relationshipCode]
+      properties:
+        customerId: { type: string, format: uuid }
+        relationshipCode:
+          type: string
+          enum: [spouse, parent, child, sibling, grandparent, grandchild, other]
+    FamilyMemberUpdate:
+      type: object
+      required: [relationshipCode]
+      properties:
+        relationshipCode:
+          type: string
+          enum: [self, spouse, parent, child, sibling, grandparent, grandchild, other]
+        admin: { type: boolean }
+    FamilyAuthorizationCreate:
+      type: object
+      required: [granteeCustomerId, scopeCode]
+      properties:
+        granteeCustomerId: { type: string, format: uuid }
+        scopeCode:
+          type: string
+          description: 仅非临床代办范围；病历与临床数据不可授权
+          enum: [appointment, payment, package_share, profile_update]
+        validFrom: { type: string, format: date-time }
+        validTo: { type: string, format: date-time }
+    FamilyAuthorizationItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        memberId: { type: string, format: uuid }
+        grantee: { $ref: "#/components/schemas/CustomerBrief" }
+        scopeCode: { type: string }
+        scopeLabel: { type: string }
+        status: { type: string, enum: [active, revoked, expired] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: string, format: date-time, nullable: true }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    DelegationCheckRequest:
+      type: object
+      required: [memberId, granteeCustomerId, scopeCode]
+      properties:
+        memberId: { type: string, format: uuid }
+        granteeCustomerId: { type: string, format: uuid }
+        scopeCode:
+          type: string
+          enum: [appointment, payment, package_share, profile_update]
+    DelegationCheckResult:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        memberId: { type: string, format: uuid }
+        granteeCustomerId: { type: string, format: uuid }
+        scopeCode: { type: string }
+        authorizationId: { type: string, format: uuid }
+        validTo: { type: string, format: date-time, nullable: true }
+    OperationResponse:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        traceId: { type: string }
+    FamilyResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/FamilyDetail" }
+        traceId: { type: string }
+    FamilyDetailResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/FamilyDetail" }
+        traceId: { type: string }
+    FamilyMemberResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/FamilyMemberItem" }
+        traceId: { type: string }
+    FamilyMemberListResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FamilyMemberItem" }
+        traceId: { type: string }
+    AuthorizationResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/FamilyAuthorizationItem" }
+        traceId: { type: string }
+    AuthorizationListResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FamilyAuthorizationItem" }
+        traceId: { type: string }
+    DelegationCheckResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/DelegationCheckResult" }
+        traceId: { type: string }
+    FamilyPageResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/FamilySummary" }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        traceId: { type: string }
+    HisPatientSearchResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/HisPatientSearchResult" }
+        traceId: { type: string }
+    HisPatientSearchResult:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/HisPatientCandidate" }
+        requiresManualVerification: { type: boolean }
+        sourceSystem: { type: string }
+        fetchedAt: { type: string, format: date-time }
+        limit: { type: integer }
+    HisPatientCandidate:
+      type: object
+      properties:
+        externalPatientId: { type: string }
+        mrn: { type: string, nullable: true }
+        nameMasked: { type: string }
+        gender: { type: string, nullable: true }
+        birthDate: { type: string, format: date, nullable: true }
+        mobileMasked: { type: string, nullable: true }
+        matchType: { type: string, enum: [mobile, id_no, his_patient_id, mrn, any] }
+        matchConfidence: { type: number, minimum: 0, maximum: 1 }
+        requiresManualVerification: { type: boolean }
+        fetchedAt: { type: string, format: date-time }
+    His360Response:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/HisPatient360" }
+        traceId: { type: string }
+    HisPatient360:
+      type: object
+      properties:
+        externalPatientId: { type: string }
+        mrn: { type: string }
+        nameMasked: { type: string }
+        gender: { type: string }
+        birthDate: { type: string, format: date }
+        mobileMasked: { type: string }
+        visits:
+          type: array
+          items: { $ref: "#/components/schemas/HisVisitItem" }
+        admissions:
+          type: array
+          items: { $ref: "#/components/schemas/HisAdmissionItem" }
+        sourceSystem: { type: string }
+        fetchedAt: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        stale: { type: boolean }
+        dataStatus: { type: string, enum: [LIVE, STALE] }
+        matchConfidence: { type: number, minimum: 0, maximum: 1 }
+        requiresManualVerification: { type: boolean }
+    HisVisitItem:
+      type: object
+      properties:
+        visitId: { type: string }
+        visitTime: { type: string, format: date-time }
+        department: { type: string }
+        doctor: { type: string }
+        diagnosis: { type: string }
+    HisAdmissionItem:
+      type: object
+      properties:
+        admissionId: { type: string }
+        admittedAt: { type: string, format: date-time }
+        dischargedAt: { type: string, format: date-time }
+        ward: { type: string }
+        diagnosis: { type: string }
+    HisPatientLinkRequest:
+      type: object
+      required: [customerId, verified]
+      properties:
+        customerId: { type: string, format: uuid }
+        verified:
+          type: boolean
+          description: 必须为 true，表示已完成人工核验。
+    HisPatientLinkResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/HisPatientLinkResult" }
+        traceId: { type: string }
+    HisPatientLinkResult:
+      type: object
+      properties:
+        identityId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        externalPatientId: { type: string }
+        sourceSystem: { type: string }
+        identityType: { type: string }
+        verified: { type: boolean }
+        linkedAt: { type: string, format: date-time }
+    HisSyncLogPageResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/HisSyncLogItem" }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        traceId: { type: string }
+    HisSyncLogItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceSystem: { type: string }
+        operation: { type: string }
+        traceId: { type: string }
+        externalPatientId: { type: string }
+        status: { type: string, enum: [SUCCESS, FAILED, DEGRADED] }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        durationMs: { type: integer, format: int64 }
+    ServiceCatalogResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { type: array, items: { type: object, additionalProperties: true } }
+        traceId: { type: string }
+    AvailabilityResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            slots: { type: array, items: { type: object, additionalProperties: true } }
+        traceId: { type: string }
+    ServiceOrderCreate:
+      type: object
+      required: [customerId, serviceCode, serviceType, requestedStartAt, durationMinutes]
+      properties:
+        customerId: { type: string, format: uuid }
+        familyId: { type: string, format: uuid }
+        serviceCode: { type: string }
+        serviceType: { type: string, enum: [escort, home_service] }
+        requestedStartAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 30, maximum: 1440 }
+        addressId: { type: string, format: uuid }
+        notes: { type: string, maxLength: 2000 }
+    ServiceOrderResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            serviceOrderId: { type: string, format: uuid }
+            orderNo: { type: string }
+            status: { type: string }
+        traceId: { type: string }
+    OrderCreate:
+      type: object
+      required: [customerId, orderType, items]
+      properties:
+        customerId: { type: string, format: uuid }
+        orderType: { type: string }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [itemCode, quantity, unitPrice]
+            properties:
+              itemCode: { type: string }
+              quantity: { type: number, exclusiveMinimum: 0 }
+              unitPrice: { type: string, pattern: "^[0-9]+(\\\\.[0-9]{1,2})?$" }
+    OrderResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { type: object, additionalProperties: true }
+        traceId: { type: string }
+    PaymentResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            paymentNo: { type: string }
+            status: { type: string }
+            paymentUrl: { type: string, format: uri }
+        traceId: { type: string }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 64 }
+        password: { type: string, minLength: 1, maxLength: 64 }
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 16 }
+    TokenResponse:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            accessToken: { type: string }
+            refreshToken: { type: string }
+            tokenType: { type: string, enum: [Bearer] }
+            expiresIn: { type: integer, description: 访问令牌有效期（秒） }
+            user: { $ref: "#/components/schemas/UserSession" }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    UserSessionResponse:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: { $ref: "#/components/schemas/UserSession" }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    UserSession:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        displayName: { type: string }
+        orgId: { type: string, format: uuid }
+        orgName: { type: string }
+        roles: { type: array, items: { type: string } }
+        permissions: { type: array, items: { type: string } }
+        dataScope: { $ref: "#/components/schemas/DataScopeView" }
+    DataScopeView:
+      type: object
+      properties:
+        all: { type: boolean }
+        orgIds: { type: array, items: { type: string, format: uuid } }
+        includeSelf: { type: boolean }
+    UserCreate:
+      type: object
+      required: [username, password, displayName, orgId, roleIds]
+      properties:
+        username:
+          type: string
+          pattern: "^[A-Za-z0-9._-]{4,64}$"
+        password: { type: string, minLength: 8, maxLength: 64, description: 必须同时包含字母和数字 }
+        displayName: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 120 }
+        mobile: { type: string, maxLength: 20, description: 仅保存脱敏结果 }
+        orgId: { type: string, format: uuid }
+        roleIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+    UserUpdate:
+      type: object
+      required: [displayName, orgId, roleIds]
+      properties:
+        displayName: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 120 }
+        mobile: { type: string, maxLength: 20 }
+        orgId: { type: string, format: uuid }
+        roleIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        status: { type: string, enum: [active, disabled] }
+    RoleSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        roleCode: { type: string }
+        roleName: { type: string }
+    UserItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        displayName: { type: string }
+        email: { type: string }
+        mobileMasked: { type: string }
+        orgId: { type: string, format: uuid }
+        orgName: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        roles: { type: array, items: { $ref: "#/components/schemas/RoleSummary" } }
+        lastLoginAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    UserResponse:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: { $ref: "#/components/schemas/UserItem" }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }
+    PageUserResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/UserItem" } }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        traceId: { type: string }
+    RoleCreate:
+      type: object
+      required: [roleCode, roleName, dataScope, permissionCodes]
+      properties:
+        roleCode: { type: string, pattern: "^[A-Za-z0-9_]{2,64}$" }
+        roleName: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        dataScope: { type: string, enum: [all, org_and_children, org, self, custom] }
+        permissionCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        orgIds:
+          type: array
+          description: dataScope=custom 时必填
+          items: { type: string, format: uuid }
+    RoleUpdate:
+      type: object
+      required: [roleName, dataScope, permissionCodes]
+      properties:
+        roleName: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        dataScope: { type: string, enum: [all, org_and_children, org, self, custom] }
+        permissionCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        orgIds:
+          type: array
+          items: { type: string, format: uuid }
+        status: { type: string, enum: [active, disabled] }
+    RoleItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        roleCode: { type: string }
+        roleName: { type: string }
+        description: { type: string }
+        dataScope: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        permissionCodes: { type: array, items: { type: string } }
+        orgIds: { type: array, items: { type: string, format: uuid } }
+        createdAt: { type: string, format: date-time }
+    RoleResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/RoleItem" }
+        traceId: { type: string }
+    RoleListResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { type: array, items: { $ref: "#/components/schemas/RoleItem" } }
+        traceId: { type: string }
+    PermissionItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        permissionCode: { type: string }
+        permissionName: { type: string }
+        module: { type: string }
+        permissionType: { type: string, enum: [menu, action, api] }
+        description: { type: string }
+        sortOrder: { type: integer }
+    PermissionGroupListResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              module: { type: string }
+              items: { type: array, items: { $ref: "#/components/schemas/PermissionItem" } }
+        traceId: { type: string }
+    OrgCreate:
+      type: object
+      required: [orgCode, orgName, parentId]
+      properties:
+        orgCode: { type: string, pattern: "^[A-Za-z0-9_]{2,64}$" }
+        orgName: { type: string, maxLength: 120 }
+        parentId: { type: string, format: uuid }
+        orgType: { type: string, maxLength: 32 }
+        sortOrder: { type: integer, minimum: 0 }
+    OrgUpdate:
+      type: object
+      required: [orgName]
+      properties:
+        orgName: { type: string, maxLength: 120 }
+        orgType: { type: string, maxLength: 32 }
+        sortOrder: { type: integer, minimum: 0 }
+        status: { type: string, enum: [active, disabled] }
+    OrgNode:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orgCode: { type: string }
+        orgName: { type: string }
+        parentId: { type: string, format: uuid }
+        orgType: { type: string }
+        sortOrder: { type: integer }
+        status: { type: string }
+        children: { type: array, items: { $ref: "#/components/schemas/OrgNode" } }
+    OrgTreeResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { type: array, items: { $ref: "#/components/schemas/OrgNode" } }
+        traceId: { type: string }
+    AuditLogItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actorUserId: { type: string, format: uuid }
+        actorName: { type: string }
+        action: { type: string }
+        resourceType: { type: string }
+        resourceId: { type: string }
+        ipAddress: { type: string }
+        traceId: { type: string }
+        detail: { type: string, description: JSON 文本 }
+        createdAt: { type: string, format: date-time }
+    PageAuditLogResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/AuditLogItem" } }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        traceId: { type: string }
+    CustomerCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+        gender: { type: string, enum: [unknown, male, female] }
+        birthDate: { type: string, format: date }
+        phone: { type: string, maxLength: 32, description: 11 位手机号，加密存储 }
+        idNo: { type: string, maxLength: 32, description: 15/18 位身份证号，加密存储 }
+        sourceCode: { type: string, maxLength: 32, description: 缺省 manual }
+        notes: { type: string, maxLength: 1000 }
+        tagIds: { type: array, items: { type: string, format: uuid } }
+        forceCreate: { type: boolean, default: false, description: 手机号或证件号重复时是否仍创建 }
+    CustomerUpdate:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100 }
+        gender: { type: string, enum: [unknown, male, female] }
+        birthDate: { type: string, format: date }
+        phone: { type: string, maxLength: 32, description: 缺省表示不变，空串表示清空 }
+        idNo: { type: string, maxLength: 32, description: 缺省表示不变，空串表示清空 }
+        sourceCode: { type: string, maxLength: 32 }
+        notes: { type: string, maxLength: 1000 }
+        tagIds: { type: array, items: { type: string, format: uuid } }
+    CustomerTag:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tagCode: { type: string }
+        tagName: { type: string }
+        tagType: { type: string }
+    CustomerSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        customerNo: { type: string }
+        name: { type: string }
+        gender: { type: string }
+        birthDate: { type: string, format: date }
+        phoneMasked: { type: string }
+        idNoMasked: { type: string }
+        sourceCode: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        tags: { type: array, items: { $ref: "#/components/schemas/CustomerTag" } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CustomerDetail:
+      allOf:
+        - $ref: "#/components/schemas/CustomerSummary"
+        - type: object
+          properties:
+            phone: { type: string, description: 仅有敏感权限时返回 }
+            idNo: { type: string, description: 仅有敏感权限时返回 }
+            sensitiveVisible: { type: boolean }
+            notes: { type: string }
+    CustomerSummaryResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/CustomerSummary" }
+        traceId: { type: string }
+    CustomerDetailResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/CustomerDetail" }
+        traceId: { type: string }
+    PageCustomerResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/CustomerSummary" } }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+            totalPages: { type: integer }
+        traceId: { type: string }
+    TagCreate:
+      type: object
+      required: [tagCode, tagName]
+      properties:
+        tagCode: { type: string, pattern: "^[A-Za-z0-9_]{2,64}$" }
+        tagName: { type: string, maxLength: 80 }
+        tagType: { type: string, enum: [customer, service, risk] }
+        sortOrder: { type: integer, minimum: 0 }
+    TagUpdate:
+      type: object
+      required: [tagName]
+      properties:
+        tagName: { type: string, maxLength: 80 }
+        tagType: { type: string, enum: [customer, service, risk] }
+        sortOrder: { type: integer, minimum: 0 }
+        status: { type: string, enum: [active, disabled] }
+    TagItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tagCode: { type: string }
+        tagName: { type: string }
+        tagType: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+    TagItemResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { $ref: "#/components/schemas/TagItem" }
+        traceId: { type: string }
+    TagListResponse:
+      type: object
+      properties:
+        code: { type: string }
+        data: { type: array, items: { $ref: "#/components/schemas/TagItem" } }
+        traceId: { type: string }

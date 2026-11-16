@@ -1,0 +1,26 @@
+logging:
+  level:
+    root: INFO
+    com.hospital.crm: DEBUG
+    org.springframework.web: INFO
+    org.flywaydb: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+crm:
+  security:
+    jwt:
+      signing-key: ${CRM_JWT_SIGNING_KEY:dev-only-hospital-crm-signing-key-change-me-32bytes}
+    bootstrap-admin:
+      password: ${CRM_BOOTSTRAP_ADMIN_PASSWORD:Crm@123456}
+    data-encryption:
+      key: ${CRM_DATA_ENCRYPTION_KEY:ZGV2LW9ubHktY3VzdG9tZXItZGF0YS1rZXktMzJieXQ=}

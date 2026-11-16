@@ -1,0 +1,137 @@
+name: hospital-crm
+
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: crm-postgres
+    environment:
+      POSTGRES_DB: ${CRM_DB_NAME:-crm}
+      POSTGRES_USER: ${CRM_DB_USERNAME:-crm}
+      POSTGRES_PASSWORD: ${CRM_DB_PASSWORD:-crm_dev_password}
+      TZ: Asia/Shanghai
+    ports:
+      - "${CRM_DB_PORT:-5432}:5432"
+    volumes:
+      - crm-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: crm-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - crm-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    container_name: crm-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-crm}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-crm_dev_password}
+      TZ: Asia/Shanghai
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - crm-rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: crm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-crmadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-crm_dev_minio}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - crm-miniodata:/data
+    restart: unless-stopped
+
+  crm-api:
+    build:
+      context: ./backend
+    container_name: crm-api
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      CRM_DB_URL: jdbc:postgresql://postgres:5432/${CRM_DB_NAME:-crm}
+      CRM_DB_USERNAME: ${CRM_DB_USERNAME:-crm}
+      CRM_DB_PASSWORD: ${CRM_DB_PASSWORD:-crm_dev_password}
+      CRM_CORS_ALLOWED_ORIGINS: http://localhost:${CRM_ADMIN_PORT:-8081},http://localhost:${CRM_PATIENT_PORT:-8082},http://localhost:5173,http://localhost:5174
+      CRM_JWT_SIGNING_KEY: ${CRM_JWT_SIGNING_KEY:-dev-only-hospital-crm-signing-key-change-me-32bytes}
+      CRM_JWT_ACCESS_MINUTES: ${CRM_JWT_ACCESS_MINUTES:-15}
+      CRM_JWT_REFRESH_DAYS: ${CRM_JWT_REFRESH_DAYS:-7}
+      CRM_LOGIN_MAX_FAILED_ATTEMPTS: ${CRM_LOGIN_MAX_FAILED_ATTEMPTS:-5}
+      CRM_LOGIN_LOCK_MINUTES: ${CRM_LOGIN_LOCK_MINUTES:-15}
+      CRM_BOOTSTRAP_ADMIN_ENABLED: ${CRM_BOOTSTRAP_ADMIN_ENABLED:-true}
+      CRM_BOOTSTRAP_ADMIN_USERNAME: ${CRM_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      CRM_BOOTSTRAP_ADMIN_PASSWORD: ${CRM_BOOTSTRAP_ADMIN_PASSWORD:-Crm@123456}
+      CRM_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${CRM_BOOTSTRAP_ADMIN_DISPLAY_NAME:-系统管理员}
+      CRM_DATA_ENCRYPTION_KEY: ${CRM_DATA_ENCRYPTION_KEY:-ZGV2LW9ubHktY3VzdG9tZXItZGF0YS1rZXktMzJieXQ=}
+      CRM_HIS_ENABLED: ${CRM_HIS_ENABLED:-false}
+      CRM_HIS_URL: ${CRM_HIS_URL:-}
+      CRM_HIS_USERNAME: ${CRM_HIS_USERNAME:-}
+      CRM_HIS_PASSWORD: ${CRM_HIS_PASSWORD:-}
+      CRM_HIS_READ_ONLY_CHECK: ${CRM_HIS_READ_ONLY_CHECK:-true}
+      TZ: Asia/Shanghai
+    ports:
+      - "${CRM_API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    restart: unless-stopped
+
+  crm-admin-web:
+    build:
+      context: ./admin-web
+    container_name: crm-admin-web
+    ports:
+      - "${CRM_ADMIN_PORT:-8081}:80"
+    depends_on:
+      crm-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  crm-patient-web:
+    build:
+      context: ./patient-mobile
+    container_name: crm-patient-web
+    ports:
+      - "${CRM_PATIENT_PORT:-8082}:80"
+    depends_on:
+      crm-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  crm-pgdata:
+  crm-redisdata:
+  crm-rabbitmqdata:
+  crm-miniodata:

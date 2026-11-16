@@ -1,0 +1,19 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "医院CRM",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "医院CRM",
+    "navigationBarBackgroundColor": "#2D6DAD",
+    "backgroundColor": "#F4F7FB"
+  }
+}
