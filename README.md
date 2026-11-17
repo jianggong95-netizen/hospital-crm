@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成** 与 **CRM-006 患者 360**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360** 与 **CRM-007 客户运营、邀约与分诊**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、Docker 开发环境、数据库迁移与 CI。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -21,11 +21,12 @@
 - [快速启动](#快速启动)
 - [HIS 集成配置（CRM-005）](#his-集成配置crm-005)
 - [患者 360（CRM-006）](#患者-360crm-006)
+- [客户运营、邀约与分诊（CRM-007）](#客户运营邀约与分诊crm-007)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-006）](#本地验证记录crm-001--crm-006)
+- [本地验证记录（CRM-001 ~ CRM-007）](#本地验证记录crm-001--crm-007)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -54,10 +55,11 @@
 │  ├─ crm-family/                # 家庭账户（成员、关系历史、家庭管理员、代办授权）
 │  ├─ crm-his/                   # HIS 集成（SQL Server 只读适配、患者查询、熔断、同步日志）
 │  ├─ crm-patient360/            # 患者 360（CRM 与 HIS 聚合、字段权限、分页与短时缓存）
+│  ├─ crm-operation/             # 客户运营（来源渠道、线索、联系记录、分派、转化追溯、邀约、活动）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -195,6 +197,32 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 
 > 权限说明：`crm:patient360:read` 在 V6 中默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；该权限不隐含敏感字段或 HIS 临床数据权限。
 
+## 客户运营、邀约与分诊（CRM-007）
+
+`crm-operation` 模块承接线索到客户的完整运营链路，所有写操作受 RBAC 与数据范围约束，敏感字段沿用客户中心规则（仅密文、检索哈希与脱敏值）：
+
+- **来源渠道**：`GET/POST /api/v1/operation/channels`、`PUT /channels/{channelId}/status`；V7 预置 `MANUAL`、`ONLINE`、`PHONE`、`REFERRAL`、`ACTIVITY`、`WALK_IN`、`HIS` 七个渠道，支持启停。
+- **线索**：`GET/POST /api/v1/operation/leads`、`GET/PUT /leads/{leadId}`、`PUT /leads/{leadId}/status`；状态机为 `NEW→CONTACTING→QUALIFIED→INVITED`，`INVALID` 可随时终止，`CONVERTED`/`MERGED` 仅由转化或合并产生。
+- **重复核验**：创建前按手机号、证件号哈希比对活跃线索；命中时返回 409 与疑似线索号，确认非同一人后可传 `forceCreate=true` 强制创建；`GET /leads/duplicates` 支持主动核验。
+- **联系记录**：`GET/POST /leads/{leadId}/contacts`，记录联系类型、时间、结果与下次跟进时间；首次登记联系记录会把 `NEW` 线索推进到 `CONTACTING`。
+- **分派与转派**：`POST /leads/{leadId}/assign` 记录 `fromUserId`、`toUserId` 与原因；`GET /leads/{leadId}/assignments` 返回完整分派历史；`GET /leads/assignees` 提供可分派员工候选。
+- **转化追溯**：`POST /leads/{leadId}/convert` 可新建客户或关联既有客户，写入 `crm_lead_conversion`（`NEW_CUSTOMER` / `EXISTING_CUSTOMER`），线索保留 `convertedCustomerId` 与 `convertedAt`；`GET /leads/{leadId}/conversion` 按线索号与客户号双向追溯。
+- **线索合并**：`POST /leads/{leadId}/merge` 将当前线索标记 `MERGED` 并指向目标线索，不复制敏感字段。
+- **邀约**：`GET/POST /api/v1/operation/invitations`、`GET /invitations/{invitationId}`、`PUT /invitations/{invitationId}/status`；状态机为 `PENDING→CONTACTED→ACCEPTED/DECLINED`，任一步可 `CANCELLED`/`EXPIRED`；接受后关联线索自动同步为 `INVITED`。
+- **活动**：`GET/POST /api/v1/operation/activities`、`GET /activities/{activityId}`、`PUT /activities/{activityId}/status`；支持 `DRAFT→PUBLISHED→CLOSED` 与 `CANCELLED`。`GET/POST /activities/{activityId}/participants` 完成报名，`PUT /activities/{activityId}/participants/{participantId}/status` 完成签到/爽约/取消；仅已发布活动可报名，名额满返回 422，同活动同手机号重复报名返回 409。
+- **审计**：渠道、线索创建/编辑/状态、联系记录、分派、合并、转化、邀约与活动操作均写入 `sys_audit_log`，记录线索号/客户号等业务标识，不写入手机号、证件号明文。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:channel:read` / `crm:channel:write` | 查看 / 创建与启停来源渠道 |
+| `crm:lead:read` / `crm:lead:write` | 查看 / 创建、编辑线索与联系记录 |
+| `crm:lead:convert` | 线索转客户并保留转化追溯 |
+| `crm:lead:assign` | 线索分派与转派 |
+| `crm:invitation:read` / `crm:invitation:write` | 查看 / 创建与推进邀约 |
+| `crm:activity:read` / `crm:activity:write` | 查看 / 创建活动、报名与签到 |
+
+> 上线提示：V7 中上述 10 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；线索手机号/证件号与活动参与人手机号均以 AES-256-GCM 加密存储，接口仅返回脱敏值。
+
 ## 健康检查与验收
 
 ```powershell
@@ -315,6 +343,20 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 缓存策略 | HIS 结果按患者主索引进行进程内 TTL 缓存（默认 60 秒，可配置），命中时标记 `cached=true`；`refresh=true` 可跳过短时缓存；失败结果不缓存 |
 | 审计留痕 | 每次 360 查看写入 `PATIENT360_VIEW`，仅记录分区状态与是否敏感可见，不写入诊疗内容、证件号或外部患者标识明文 |
 
+### CRM-007 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 线索来源渠道 | V7 预置 7 个渠道并支持创建/启停；线索必须绑定有效来源渠道 |
+| 线索全流程 | 线索创建、编辑、状态机、联系记录、分派/转派、合并与失效均受权限与状态校验 |
+| 线索转客户可追溯 | `POST /leads/{leadId}/convert` 新建或关联客户并写入 `crm_lead_conversion`；线索保留 `convertedCustomerId` 与 `convertedAt`，`GET /leads/{leadId}/conversion` 可回溯线索号与客户号 |
+| 重复线索提示合并核验 | 手机号/证件号哈希命中活跃线索时返回 409 与疑似线索号；`forceCreate=true` 可确认非同一人后建档；`GET /leads/duplicates` 支持主动核验，`POST /leads/{leadId}/merge` 标记 `MERGED` 并指向目标线索 |
+| 邀约任务 | 邀约支持关联线索或客户，状态机 `PENDING→CONTACTED→ACCEPTED/DECLINED` 并可取消/过期；接受后线索同步为 `INVITED` |
+| 活动参与 | 活动 `DRAFT→PUBLISHED→CLOSED`；仅发布后可报名，名额满返回 422，同活动同手机号重复报名返回 409，支持签到/爽约/取消 |
+| 字段权限与脱敏 | 线索手机号/证件号与参与人手机号均加密存储，列表与详情仅返回脱敏值；接口按 `crm:lead:*`、`crm:invitation:*`、`crm:activity:*` 分权 |
+| 审计留痕 | 渠道、线索、联系记录、分派、合并、转化、邀约与活动操作写入 `sys_audit_log`，不含手机号/证件号明文 |
+| 数据库迁移 | `V7__operation.sql` 新增 8 张表、3 个业务号序列、7 条渠道种子与 10 项权限 |
+
 ## 数据库与迁移
 
 - 迁移目录：`backend/crm-boot/src/main/resources/db/migration`
@@ -325,6 +367,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-004 新增 `crm_family_authorization`、家庭成员状态字段与家庭账户权限
 - CRM-005 新增 `crm_patient_snapshot`、HIS 同步日志查询索引与 `his:patient:read` / `his:patient:link` 权限
 - CRM-006 新增客户外部身份查询索引与 `crm:patient360:read` 权限，不复制 HIS 临床数据
+- CRM-007 新增 `crm_source_channel`、`crm_lead`、`crm_lead_contact_record`、`crm_lead_assignment`、`crm_lead_conversion`、`crm_invitation`、`crm_activity`、`crm_activity_participant` 及线索/邀约/活动业务号序列与 `crm:channel:*` / `crm:lead:*` / `crm:invitation:*` / `crm:activity:*` 权限
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -335,7 +378,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成与 CRM-006 患者 360 接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360 与 CRM-007 客户运营接口）
 
 ## 已实现能力与明确未包含
 
@@ -343,7 +386,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 - Maven 多模块工程、统一响应与异常处理、traceId 透传
 - Actuator 健康检查、就绪/存活探针、Prometheus 指标端点
-- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360）
+- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营）
 - JWT 无状态认证、刷新令牌轮换与复用检测、登录失败锁定
 - 用户、组织、角色、权限管理，RBAC + 五级数据范围（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）
 - 客户档案 CRUD、AES-256-GCM 敏感字段加密、HMAC 哈希检索、脱敏展示与敏感权限控制
@@ -354,27 +397,36 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - HIS 患者候选查询与 360 聚合：最小化脱敏返回，快照标记来源/获取时间/有效期/置信度，HIS 不可用时返回 `STALE`
 - HIS 同步日志与查询审计；人工核验后绑定 HIS 患者主索引，绑定值加密并支持哈希检索
 - 患者 360 聚合视图：CRM 客户/标签/家庭 + HIS 就诊/住院摘要，分区来源与更新时间、字段权限、独立分页与 HIS 短时缓存；HIS 不可用时明确返回 `UNAVAILABLE`/`STALE`，不伪造数据
-- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询与患者 360 查看），支持按动作、资源、时间与数据范围查询
-- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、标签、用户/角色/组织/审计管理页面
+- 客户运营：来源渠道字典、线索创建与状态机、重复线索核验与强制建档、联系记录、分派/转派历史、线索合并、线索转客户追溯（新建或关联既有客户）
+- 邀约任务：关联线索/客户、状态机推进、接受后线索同步 `INVITED`；活动运营：创建、发布、报名（名额与手机号去重）、签到/爽约/取消
+- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约与活动），支持按动作、资源、时间与数据范围查询
+- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
 - Docker Compose 开发环境与 GitHub Actions CI
 
 明确未包含（按任务逐步交付）：
 
-- 预约、服务订单、随访、会员、投诉等业务模块（CRM-007 及后续任务）
+- 预约、服务订单、随访、会员、投诉等业务模块（CRM-008 及后续任务）
 - 支付、退款、会员、随访、客服、商保等业务模块
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
-> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态。预约、订单、随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
+> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值。预约、订单、随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-006）
+## 本地验证记录（CRM-001 ~ CRM-007）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
-| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（68 个测试通过，8 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 服务测试 7 个） |
+| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（94 个测试执行，85 通过、9 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个） |
 | 后端可执行包 | `mvnw.cmd -DskipTests package` | 生成 `crm-boot/target/crm-api.jar` |
-| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1/V2/V3/V4/V5/V6 + 启动 jar | 通过，`flyway_schema_history` 最新版本为 `6:true`，`idx_identity_customer` 与 `crm:patient360:read` 已创建，健康检查返回 `UP` |
+| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1/V2/V3/V4/V5/V6/V7 + 启动 jar | 通过，`flyway_schema_history` 最新版本为 `7:true`，健康检查返回 `UP` |
+| CRM-007 V7 迁移内容 | 查询 `information_schema` / `crm_source_channel` / `sys_permission` | 8 张新表、3 个业务号序列、7 条渠道种子、10 项权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
+| 重复线索核验 | 相同手机号连续创建线索，再带 `forceCreate=true` 创建 | 首次 200；重复创建返回 409 `BUSINESS_CONFLICT` 并提示既有线索号；强制创建 200；`/leads/duplicates` 返回 2 条疑似线索 |
+| 线索转客户追溯 | 新建客户转化 + 关联既有客户转化 | `NEW_CUSTOMER` 与 `EXISTING_CUSTOMER` 均写入 `crm_lead_conversion`，`/leads/{id}/conversion` 返回线索 ID 与客户号；客户已存在时返回 422 并提示改为关联 |
+| 邀约状态推进 | 创建邀约 → CONTACTED → ACCEPTED | 邀约号 `I100000`，状态推进成功；接受后关联线索自动变为 `INVITED` |
+| 活动报名与签到 | 发布前报名、发布后报名、重复手机号、超额、签到、关闭 | 发布前与超额返回 422，重复手机号返回 409，报名与签到 200，关闭时有效报名人数 2 |
+| 线索与参与人加密 | 查询 `crm_lead`、`sys_audit_log` | 手机号仅存 52 字符密文、HMAC 哈希与脱敏值，明文模式匹配 0 条；审计中手机号明文 0 条 |
+| 未认证访问 | 未携带令牌请求 `/operation/leads` | 返回 401 统一 JSON |
 | 未认证与越权 | `curl` 访问用户/角色/组织/客户接口 | 未认证返回 401；缺权限返回 403，均为统一 JSON |
 | 数据范围 | 科室管理员账号查询用户列表 | 仅返回本组织成员，越范围用户不可见 |
 | 刷新令牌轮换与复用 | 连续调用 `/auth/refresh` | 首次成功，旧令牌复用返回 401 并撤销全部令牌 |
@@ -399,7 +451,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | HIS 人工核验 | `verified=false` 调用 link | 返回 422，不写入绑定关系 |
 | HIS 注入式输入 | 关键字传 `' or 1=1 --` | 作为普通参数处理，返回 0 条候选，无 SQL 异常 |
 | HIS 同步日志 | 查询 `/api/v1/his/sync-logs` | 分页返回检索/360/绑定记录与失败错误码，未配置 HIS 时仍可查询本地日志 |
-| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 43 个路径、80 个 schema，引用完整 |
+| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 66 个路径、99 个 schema，schema 与 parameter 引用全部可解析 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI

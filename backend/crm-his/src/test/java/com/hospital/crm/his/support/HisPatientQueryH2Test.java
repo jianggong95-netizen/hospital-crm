@@ -34,6 +34,8 @@ class HisPatientQueryH2Test {
         properties.setPassword("");
         properties.setDriverClassName("org.h2.Driver");
         properties.setReadOnlyCheck(false);
+        // 本机 CI/开发机首次加载 H2 驱动可能超过默认 3 秒，测试环境放宽连接超时避免误报
+        properties.setConnectionTimeoutMs(15_000);
         properties.getPatientView().setTable("v_crm_patient");
         properties.getVisitView().setTable("v_crm_visit");
         properties.getAdmissionView().setTable("v_crm_admission");

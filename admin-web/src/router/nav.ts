@@ -27,6 +27,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:customer:read'
   },
   {
+    path: '/operation',
+    label: '客户运营',
+    short: '营',
+    tint: 'linear-gradient(135deg, #2d6dad, #63a6d3)',
+    permission: 'crm:lead:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

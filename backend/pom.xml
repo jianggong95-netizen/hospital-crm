@@ -25,6 +25,7 @@
     <module>crm-family</module>
     <module>crm-his</module>
     <module>crm-patient360</module>
+    <module>crm-operation</module>
     <module>crm-boot</module>
   </modules>
 

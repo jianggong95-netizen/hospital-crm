@@ -14,6 +14,7 @@ tags:
   - name: Customers
   - name: Families
   - name: HIS
+  - name: Operation
   - name: Service
   - name: Orders
   - name: Followups
@@ -1110,6 +1111,725 @@ paths:
               schema: { $ref: "#/components/schemas/TagItemResponse" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /operation/channels:
+    get:
+      tags: [Operation]
+      summary: 查询来源渠道
+      x-required-permission: crm:channel:read
+      parameters:
+        - in: query
+          name: includeDisabled
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 渠道列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OperationChannel" }
+    post:
+      tags: [Operation]
+      summary: 创建来源渠道
+      x-required-permission: crm:channel:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelCode, channelName]
+              properties:
+                channelCode: { type: string, pattern: "^[A-Z0-9_]{2,64}$" }
+                channelName: { type: string, maxLength: 100 }
+                channelType:
+                  type: string
+                  enum: [online, offline, referral, activity, his, other]
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationChannel" }
+  /operation/channels/{channelId}/status:
+    put:
+      tags: [Operation]
+      summary: 启停来源渠道
+      x-required-permission: crm:channel:write
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationChannel" }
+  /operation/leads:
+    get:
+      tags: [Operation]
+      summary: 分页查询线索
+      x-required-permission: crm:lead:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [NEW, CONTACTING, QUALIFIED, INVITED, CONVERTED, INVALID, MERGED] }
+        - in: query
+          name: channelCode
+          schema: { type: string, maxLength: 64 }
+        - in: query
+          name: ownerUserId
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 线索分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/OperationLead" }
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      totalPages: { type: integer }
+    post:
+      tags: [Operation]
+      summary: 创建线索
+      description: |
+        手机号/证件号重复时返回 409 与疑似重复线索号；确认非同一人时传 forceCreate=true。
+        线索敏感字段仅返回脱敏值。
+      x-required-permission: crm:lead:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, sourceChannelCode]
+              properties:
+                name: { type: string, maxLength: 100 }
+                gender: { type: string, enum: [unknown, male, female] }
+                birthDate: { type: string, format: date }
+                phone: { type: string, maxLength: 32 }
+                idNo: { type: string, maxLength: 32 }
+                sourceChannelCode: { type: string, maxLength: 64 }
+                ownerUserId: { type: string, format: uuid }
+                remark: { type: string, maxLength: 1000 }
+                forceCreate: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLead" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /operation/leads/duplicates:
+    get:
+      tags: [Operation]
+      summary: 重复线索核验
+      x-required-permission: crm:lead:read
+      parameters:
+        - in: query
+          name: phone
+          schema: { type: string }
+        - in: query
+          name: idNo
+          schema: { type: string }
+      responses:
+        "200":
+          description: 疑似重复线索
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OperationDuplicateLead" }
+  /operation/leads/assignees:
+    get:
+      tags: [Operation]
+      summary: 查询可分派员工
+      x-required-permission: crm:lead:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: 可分派员工
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OperationAssignee" }
+  /operation/leads/{leadId}:
+    get:
+      tags: [Operation]
+      summary: 线索详情
+      x-required-permission: crm:lead:read
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: 线索详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLeadDetail" }
+    put:
+      tags: [Operation]
+      summary: 编辑线索
+      x-required-permission: crm:lead:write
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                gender: { type: string, enum: [unknown, male, female] }
+                birthDate: { type: string, format: date }
+                phone: { type: string, maxLength: 32 }
+                idNo: { type: string, maxLength: 32 }
+                sourceChannelCode: { type: string, maxLength: 64 }
+                ownerUserId: { type: string, format: uuid }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLead" }
+  /operation/leads/{leadId}/status:
+    put:
+      tags: [Operation]
+      summary: 线索状态流转
+      description: 允许 NEW→CONTACTING→QUALIFIED→INVITED；CONVERTED 与 MERGED 只能通过转化/合并接口产生。
+      x-required-permission: crm:lead:write
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [CONTACTING, QUALIFIED, INVITED, INVALID] }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLead" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /operation/leads/{leadId}/convert:
+    post:
+      tags: [Operation]
+      summary: 线索转客户
+      description: 可创建新客户或关联既有客户；写入 crm_lead_conversion，保留线索号与客户号追溯。
+      x-required-permission: crm:lead:convert
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId: { type: string, format: uuid }
+                createCustomer: { type: boolean, default: true }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 转化成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationConversion" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /operation/leads/{leadId}/merge:
+    post:
+      tags: [Operation]
+      summary: 合并线索
+      description: 当前线索标记 MERGED 并指向目标线索，不复制敏感字段。
+      x-required-permission: crm:lead:write
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetLeadId]
+              properties:
+                targetLeadId: { type: string, format: uuid }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 合并成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLead" }
+  /operation/leads/{leadId}/assign:
+    post:
+      tags: [Operation]
+      summary: 线索分派/转派
+      x-required-permission: crm:lead:assign
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toUserId]
+              properties:
+                toUserId: { type: string, format: uuid }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 分派成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationLead" }
+  /operation/leads/{leadId}/contacts:
+    get:
+      tags: [Operation]
+      summary: 线索联系记录
+      x-required-permission: crm:lead:read
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 联系记录分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/OperationContactRecord" }
+                      total: { type: integer }
+    post:
+      tags: [Operation]
+      summary: 新增联系记录
+      x-required-permission: crm:lead:write
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactType, content, resultCode]
+              properties:
+                contactType: { type: string, enum: [phone, wechat, sms, visit, other] }
+                contactedAt: { type: string, format: date-time }
+                content: { type: string, maxLength: 2000 }
+                resultCode:
+                  type: string
+                  enum: [CONNECTED, NO_ANSWER, REFUSED, INTERESTED, CONVERTED, OTHER]
+                nextFollowUpAt: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationContactRecord" }
+  /operation/leads/{leadId}/conversion:
+    get:
+      tags: [Operation]
+      summary: 线索转化记录
+      x-required-permission: crm:lead:read
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: 转化记录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationConversion" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /operation/leads/{leadId}/assignments:
+    get:
+      tags: [Operation]
+      summary: 线索分派历史
+      x-required-permission: crm:lead:read
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: 分派历史
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OperationAssignment" }
+  /operation/invitations:
+    get:
+      tags: [Operation]
+      summary: 分页查询邀约
+      x-required-permission: crm:invitation:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [PENDING, CONTACTED, ACCEPTED, DECLINED, CANCELLED, EXPIRED] }
+        - in: query
+          name: ownerUserId
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 邀约分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/OperationInvitation" }
+                      total: { type: integer }
+    post:
+      tags: [Operation]
+      summary: 创建邀约
+      x-required-permission: crm:invitation:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelCode, title, plannedAt]
+              properties:
+                leadId: { type: string, format: uuid }
+                customerId: { type: string, format: uuid }
+                channelCode: { type: string, maxLength: 64 }
+                title: { type: string, maxLength: 200 }
+                plannedAt: { type: string, format: date-time }
+                ownerUserId: { type: string, format: uuid }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationInvitation" }
+  /operation/invitations/{invitationId}:
+    get:
+      tags: [Operation]
+      summary: 邀约详情
+      x-required-permission: crm:invitation:read
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      responses:
+        "200":
+          description: 邀约详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationInvitation" }
+  /operation/invitations/{invitationId}/status:
+    put:
+      tags: [Operation]
+      summary: 推进邀约状态
+      description: PENDING→CONTACTED→ACCEPTED/DECLINED；接受后关联线索同步为 INVITED。
+      x-required-permission: crm:invitation:write
+      parameters:
+        - $ref: "#/components/parameters/InvitationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [CONTACTED, ACCEPTED, DECLINED, CANCELLED, EXPIRED] }
+                result: { type: string, maxLength: 500 }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationInvitation" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /operation/activities:
+    get:
+      tags: [Operation]
+      summary: 分页查询活动
+      x-required-permission: crm:activity:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, PUBLISHED, CLOSED, CANCELLED] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 活动分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/OperationActivity" }
+                      total: { type: integer }
+    post:
+      tags: [Operation]
+      summary: 创建活动
+      x-required-permission: crm:activity:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activityName, startAt, endAt]
+              properties:
+                activityName: { type: string, maxLength: 200 }
+                activityType:
+                  type: string
+                  enum: [health_lecture, screening, charity, marketing, other]
+                startAt: { type: string, format: date-time }
+                endAt: { type: string, format: date-time }
+                location: { type: string, maxLength: 200 }
+                capacity: { type: integer, minimum: 0 }
+                description: { type: string, maxLength: 2000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationActivity" }
+  /operation/activities/{activityId}:
+    get:
+      tags: [Operation]
+      summary: 活动详情
+      x-required-permission: crm:activity:read
+      parameters:
+        - $ref: "#/components/parameters/ActivityId"
+      responses:
+        "200":
+          description: 活动详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationActivity" }
+  /operation/activities/{activityId}/status:
+    put:
+      tags: [Operation]
+      summary: 活动状态流转
+      x-required-permission: crm:activity:write
+      parameters:
+        - $ref: "#/components/parameters/ActivityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [PUBLISHED, CLOSED, CANCELLED] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationActivity" }
+  /operation/activities/{activityId}/participants:
+    get:
+      tags: [Operation]
+      summary: 活动参与人
+      x-required-permission: crm:activity:read
+      parameters:
+        - $ref: "#/components/parameters/ActivityId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 参与人分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/OperationParticipant" }
+                      total: { type: integer }
+    post:
+      tags: [Operation]
+      summary: 活动报名
+      description: 仅已发布活动可报名；同一活动手机号重复报名返回 409；名额满返回 422。
+      x-required-permission: crm:activity:write
+      parameters:
+        - $ref: "#/components/parameters/ActivityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [participantName]
+              properties:
+                leadId: { type: string, format: uuid }
+                customerId: { type: string, format: uuid }
+                participantName: { type: string, maxLength: 100 }
+                phone: { type: string, maxLength: 32 }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 报名成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationParticipant" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /operation/activities/{activityId}/participants/{participantId}/status:
+    put:
+      tags: [Operation]
+      summary: 参与状态流转
+      x-required-permission: crm:activity:write
+      parameters:
+        - $ref: "#/components/parameters/ActivityId"
+        - $ref: "#/components/parameters/ParticipantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [ATTENDED, CANCELLED, NO_SHOW] }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OperationParticipant" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1132,6 +1852,41 @@ components:
       name: memberId
       required: true
       schema: { type: string, format: uuid }
+    ChannelId:
+      in: path
+      name: channelId
+      required: true
+      schema: { type: string, format: uuid }
+    LeadId:
+      in: path
+      name: leadId
+      required: true
+      schema: { type: string, format: uuid }
+    InvitationId:
+      in: path
+      name: invitationId
+      required: true
+      schema: { type: string, format: uuid }
+    ActivityId:
+      in: path
+      name: activityId
+      required: true
+      schema: { type: string, format: uuid }
+    ParticipantId:
+      in: path
+      name: participantId
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      in: query
+      name: page
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      in: query
+      name: pageSize
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
     IdempotencyKey:
       in: header
       name: Idempotency-Key
@@ -2098,3 +2853,161 @@ components:
         code: { type: string }
         data: { type: array, items: { $ref: "#/components/schemas/TagItem" } }
         traceId: { type: string }
+    OperationChannel:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        channelCode: { type: string }
+        channelName: { type: string }
+        channelType:
+          type: string
+          enum: [online, offline, referral, activity, his, other]
+        status: { type: string, enum: [active, disabled] }
+        remark: { type: string }
+    OperationLead:
+      type: object
+      description: 线索摘要，手机号与证件号仅返回脱敏值
+      properties:
+        id: { type: string, format: uuid }
+        leadNo: { type: string, description: 线索号，用于全流程追溯 }
+        name: { type: string }
+        gender: { type: string, enum: [unknown, male, female] }
+        birthDate: { type: string, format: date }
+        phoneMasked: { type: string }
+        idNoMasked: { type: string }
+        sourceChannelCode: { type: string }
+        sourceChannelName: { type: string }
+        status:
+          type: string
+          enum: [NEW, CONTACTING, QUALIFIED, INVITED, CONVERTED, INVALID, MERGED]
+        ownerUserId: { type: string, format: uuid }
+        ownerName: { type: string }
+        orgId: { type: string, format: uuid }
+        convertedCustomerId: { type: string, format: uuid, description: 转化后的客户ID }
+        mergedIntoLeadId: { type: string, format: uuid, description: 合并指向的目标线索ID }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OperationLeadDetail:
+      type: object
+      required: [summary]
+      properties:
+        summary: { $ref: "#/components/schemas/OperationLead" }
+        remark: { type: string }
+        convertedAt: { type: string, format: date-time }
+        recentContacts:
+          type: array
+          items: { $ref: "#/components/schemas/OperationContactRecord" }
+        assignments:
+          type: array
+          items: { $ref: "#/components/schemas/OperationAssignment" }
+        conversion: { $ref: "#/components/schemas/OperationConversion" }
+    OperationDuplicateLead:
+      type: object
+      description: 重复核验命中的疑似线索
+      properties:
+        id: { type: string, format: uuid }
+        leadNo: { type: string }
+        name: { type: string }
+        phoneMasked: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+    OperationContactRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        contactType: { type: string, enum: [phone, wechat, sms, visit, other] }
+        contactedAt: { type: string, format: date-time }
+        contactedBy: { type: string, format: uuid }
+        contactedByName: { type: string }
+        content: { type: string }
+        resultCode:
+          type: string
+          enum: [CONNECTED, NO_ANSWER, REFUSED, INTERESTED, CONVERTED, OTHER]
+        nextFollowUpAt: { type: string, format: date-time }
+    OperationAssignment:
+      type: object
+      description: 线索分派/转派历史
+      properties:
+        id: { type: string, format: uuid }
+        fromUserId: { type: string, format: uuid }
+        fromUserName: { type: string }
+        toUserId: { type: string, format: uuid }
+        toUserName: { type: string }
+        reason: { type: string }
+        assignedAt: { type: string, format: date-time }
+    OperationConversion:
+      type: object
+      description: 线索转客户追溯记录，保留线索号与客户号
+      properties:
+        id: { type: string, format: uuid }
+        leadId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        customerNo: { type: string }
+        customerName: { type: string }
+        conversionMode: { type: string, enum: [NEW_CUSTOMER, EXISTING_CUSTOMER] }
+        remark: { type: string }
+        convertedBy: { type: string, format: uuid }
+        convertedAt: { type: string, format: date-time }
+    OperationAssignee:
+      type: object
+      description: 可分派员工
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        displayName: { type: string }
+        orgId: { type: string, format: uuid }
+    OperationInvitation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        invitationNo: { type: string }
+        leadId: { type: string, format: uuid }
+        leadNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerNo: { type: string }
+        customerName: { type: string }
+        channelCode: { type: string }
+        channelName: { type: string }
+        title: { type: string }
+        plannedAt: { type: string, format: date-time }
+        ownerUserId: { type: string, format: uuid }
+        ownerName: { type: string }
+        status:
+          type: string
+          enum: [PENDING, CONTACTED, ACCEPTED, DECLINED, CANCELLED, EXPIRED]
+        result: { type: string }
+        remark: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OperationActivity:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        activityNo: { type: string }
+        activityName: { type: string }
+        activityType:
+          type: string
+          enum: [health_lecture, screening, charity, marketing, other]
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        location: { type: string }
+        capacity: { type: integer }
+        status: { type: string, enum: [DRAFT, PUBLISHED, CLOSED, CANCELLED] }
+        description: { type: string }
+        participantCount: { type: integer, description: "有效报名人数" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OperationParticipant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        activityId: { type: string, format: uuid }
+        leadId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        participantName: { type: string }
+        phoneMasked: { type: string }
+        status: { type: string, enum: [REGISTERED, ATTENDED, CANCELLED, NO_SHOW] }
+        registeredAt: { type: string, format: date-time }
+        checkedInAt: { type: string, format: date-time }
+        remark: { type: string }
+
