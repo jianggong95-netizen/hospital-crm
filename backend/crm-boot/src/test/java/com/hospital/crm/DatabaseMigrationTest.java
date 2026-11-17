@@ -338,9 +338,57 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void memberMigrationCreatesLevelPackageCardAndShareTables() {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema = 'public' "
+                        + "and table_name in ('crm_member_level','crm_member_package','crm_member_card',"
+                        + "'crm_member_card_usage','crm_member_share')",
+                Integer.class);
+        assertEquals(5, tableCount);
+
+        Integer ledgerColumns = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.columns "
+                        + "where table_schema = 'public' and table_name = 'crm_member_ledger' "
+                        + "and column_name in ('balance_after','points_after','biz_no')",
+                Integer.class);
+        assertEquals(3, ledgerColumns);
+
+        Integer accountIndex = jdbcTemplate.queryForObject(
+                "select count(*) from pg_indexes where schemaname = 'public' "
+                        + "and indexname = 'uq_member_account_customer'",
+                Integer.class);
+        assertEquals(1, accountIndex);
+
+        Integer levelSeeds = jdbcTemplate.queryForObject(
+                "select count(*) from crm_member_level", Integer.class);
+        assertTrue(levelSeeds != null && levelSeeds >= 5);
+
+        Integer packageSeeds = jdbcTemplate.queryForObject(
+                "select count(*) from crm_member_package", Integer.class);
+        assertTrue(packageSeeds != null && packageSeeds >= 3);
+
+        Integer memberPermissions = jdbcTemplate.queryForObject(
+                "select count(*) from sys_permission where permission_code in "
+                        + "('crm:member:read','crm:member:write','crm:member:manage')",
+                Integer.class);
+        assertEquals(3, memberPermissions);
+
+        Integer granted = jdbcTemplate.queryForObject(
+                "select count(*) from sys_role_permission rp "
+                        + "join sys_role r on r.id = rp.role_id "
+                        + "join sys_permission p on p.id = rp.permission_id "
+                        + "where r.role_code = 'SUPER_ADMIN' and p.permission_code like 'crm:%'",
+                Integer.class);
+        Integer crmPermissions = jdbcTemplate.queryForObject(
+                "select count(*) from sys_permission where permission_code like 'crm:%'",
+                Integer.class);
+        assertEquals(crmPermissions, granted);
+    }
+
+    @Test
     void appliedMigrationsIncludeSystemAuthScript() {
         Integer appliedMigrations = jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where success = true", Integer.class);
-        assertTrue(appliedMigrations != null && appliedMigrations >= 11);
+        assertTrue(appliedMigrations != null && appliedMigrations >= 12);
     }
 }

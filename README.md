@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务** 与 **CRM-011 订单、收费、支付与退款**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务**、**CRM-011 订单、收费、支付与退款** 与 **CRM-012 会员、充值、次卡与套餐**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、会员等级与余额账本、积分与自动升级、次卡扣次与返还、套餐购买、共享授权与退款权益返还、Docker 开发环境、数据库迁移与 CI。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -26,11 +26,12 @@
 - [陪诊服务（CRM-009）](#陪诊服务crm-009)
 - [上门服务（CRM-010）](#上门服务crm-010)
 - [订单、收费、支付与退款（CRM-011）](#订单收费支付与退款crm-011)
+- [会员、充值、次卡与套餐（CRM-012）](#会员充值次卡与套餐crm-012)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-011）](#本地验证记录crm-001--crm-011)
+- [本地验证记录（CRM-001 ~ CRM-012）](#本地验证记录crm-001--crm-012)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -64,10 +65,11 @@
 │  ├─ crm-escort/                # 陪诊服务（陪诊师档案与资质、排班防冲突、派单校验、履约计时、评价）
 │  ├─ crm-homevisit/             # 上门服务（项目目录与审核、服务地址、人员资质、订单派单、执行记录、异常上报与升级）
 │  ├─ crm-order/                 # 订单与收银（统一订单、支付单、渠道回调、退款、对账、发票接口抽象）
+│  ├─ crm-member/                # 会员（等级、余额账本、积分、次卡、套餐、共享授权、退款权益返还）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -334,6 +336,42 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 | 审计留痕 | 13 类资金动作写入 `sys_audit_log`，`detail` 中手机号明文匹配 0 条 |
 | 数据库迁移 | `V11__order_payment.sql` 新增对账批次/差异、发票表与 4 项权限，并为支付单补充渠道交易号与幂等键唯一索引 |
 
+## 会员、充值、次卡与套餐（CRM-012）
+
+`crm-member` 模块承接会员等级、储值余额、积分、次卡、套餐与共享授权。**余额与积分的每一次变动都会写入 `crm_member_ledger`**（含变动额、积分增减、变动后余额/积分、关联订单与业务号），扣减一律使用数据库条件更新（`balance >= amount`、`remaining_times >= times`、`points >= delta`），并发请求不会超扣。
+
+- **等级**：`GET /api/v1/memberships/levels` 返回 5 级种子（普通/银卡/金卡/铂金/钻石，门槛 0/1000/5000/20000/50000 分，折扣率 1.00/0.98/0.95/0.92/0.88）；积分调整后按门槛自动重算等级。
+- **账户**：`GET/POST /api/v1/memberships/accounts`、`GET /accounts/{accountId}`（含有效次卡）、`GET /accounts/{accountId}/ledger`；同一客户重复开户返回 409。
+- **充值与消费**：`POST /memberships/recharges`、`POST /memberships/consumptions`；充值写 `RECHARGE` 账本；消费按客户定位账户，余额不足且 `allowShared=true` 时由已授权的家庭成员账户代付，仍不足返回 422「账户余额不足」。
+- **积分**：`POST /memberships/points/adjustments`；正数增加、负数扣减（条件更新防负），写 `POINTS_ADJUST` 账本并刷新等级。
+- **套餐**：`GET/POST /memberships/packages`、`PUT /packages/{packageCode}`、`PUT /packages/{packageCode}/status`、`POST /packages/{packageCode}/purchase`；`TIMES` 生成次卡（`validTo = 购买日 + validDays`），`BALANCE` 入余额，`POINTS` 入积分，权益发放写 `PACKAGE_PURCHASE` 账本；未启用套餐购买返回 422。
+- **次卡**：`GET /memberships/cards`、`GET /cards/{cardId}`（含扣次记录）、`POST /cards/{cardId}/consumptions`、`POST /cards/{cardId}/refunds`；扣次写 `crm_member_card_usage`（`CONSUMED`）与 `CARD_CONSUME` 账本，剩余为 0 自动置 `EXHAUSTED`；返还回补次数并写 `CARD_REFUND` 账本，对同一扣次记录重复返还返回 422。
+- **共享授权**：`GET/POST /memberships/shares`、`PUT /shares/{shareId}/revoke`；授权人与使用人不能相同，重复有效授权返回 409，撤销后再次撤销返回 422。
+- **退款权益返还**：`POST /memberships/refund-reversals`；`RECHARGE` 订单按退款金额扣回余额（不超过当前余额）；`PACKAGE_PURCHASE` 订单作废生成的次卡并返回剩余次数、按退款比例扣回积分；每次扣回写 `REFUND_REVERSAL` / `CARD_VOID_ON_REFUND` 账本。
+- **审计**：`MEMBER_ACCOUNT_OPEN` / `MEMBER_RECHARGE` / `MEMBER_CONSUME` / `MEMBER_POINTS_ADJUST` / `MEMBER_REFUND_REVERSAL` / `MEMBER_PACKAGE_CREATE` / `MEMBER_PACKAGE_UPDATE` / `MEMBER_PACKAGE_STATUS` / `MEMBER_PACKAGE_PURCHASE` / `MEMBER_CARD_CONSUME` / `MEMBER_CARD_REFUND` / `MEMBER_SHARE_CREATE` / `MEMBER_SHARE_REVOKE` 均落库，仅记录账户号、金额、次数与业务号，不含客户手机号。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:member:read` | 查看会员等级、账户、账本、次卡、套餐与共享授权 |
+| `crm:member:write` | 开户、充值、余额消费、积分调整、购买套餐、扣次与返还、共享授权 |
+| `crm:member:manage` | 维护套餐目录与启停、退款权益返还 |
+
+> 上线提示：V12 中上述 3 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；余额、积分、次卡均为权益载体，退款返还接口建议只开放给财务或会员主管角色。
+
+### CRM-012 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 并发消费不超扣 | 余额 100 的账户两笔并发消费 80，恰好一笔成功、一笔 422「账户余额不足」，余额不会为负 |
+| 每次变动有账本 | 开户、充值、消费、积分调整、套餐购买、扣次、返还、退款返还均写 `crm_member_ledger`，条目记录变动额与变动后快照 |
+| 次卡不超扣 | 剩余 2 次的次卡并发扣 2 次仅一笔成功；扣到 0 自动置 `EXHAUSTED`；过期/作废卡扣次 422 |
+| 扣次返还 | 返还回补次数并写 `CARD_REFUND` 账本；同一扣次记录重复返还 422 |
+| 套餐购买 | `TIMES` 生成次卡并绑定来源订单；`BALANCE`/`POINTS` 直接入账；未启用套餐 422；缺少对应载荷 422 |
+| 共享代付 | 余额不足且存在有效 `BALANCE` 授权时由授权人账户扣款；无授权仍返回 422 |
+| 积分升级 | 积分跨过门槛后自动升级（如 1000 分升银卡）；扣减不会把积分扣成负数 |
+| 退款返还权益 | 充值退款按金额扣回余额；套餐退款作废次卡并返还剩余次数、按比例扣回积分 |
+| 数据库迁移 | `V12__member.sql` 新增等级/套餐/次卡/扣次/共享 5 张表、2 个业务号序列、3 项权限，并为账户与账本补充冻结金额、变动后快照与索引 |
+
 ## 健康检查与验收
 
 ```powershell
@@ -523,6 +561,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-009 新增 `crm_escort`、`crm_escort_qualification`、`crm_escort_schedule`、`crm_escort_order`、`crm_escort_review`、陪诊号与订单号序列及 `crm:escort:*` / `crm:escortorder:*` 权限；排班唯一索引与评价订单唯一索引兜底
 - CRM-010 新增 `crm_home_service`、`crm_home_address`、`crm_home_visit_order`、`crm_home_visit_execution`、`crm_home_visit_exception`、`crm_home_staff_qualification`、上门服务订单号序列、3 条已发布服务种子与 `crm:homevisit:*` 权限；默认地址使用部分唯一索引保证每客户唯一
 - CRM-011 在基线 `crm_order`、`crm_order_item`、`crm_payment`、`crm_refund` 之上新增 `crm_reconciliation_batch`、`crm_reconciliation_diff`、`crm_invoice`、订单/支付/退款/发票业务号序列与 `crm:order:*` / `crm:payment:*` 权限；支付单补充渠道交易号与幂等键唯一索引，退款单补充审核与渠道退款号
+- CRM-012 在基线 `crm_member_account`、`crm_member_ledger` 之上新增 `crm_member_level`、`crm_member_package`、`crm_member_card`、`crm_member_card_usage`、`crm_member_share`、账户号/卡号序列、5 条等级种子、3 条套餐种子与 `crm:member:*` 权限；账户补充冻结金额与更新时间，账本补充变动后余额/积分与业务号并建立客户唯一索引
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -533,7 +572,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务与 CRM-011 订单支付退款对账发票接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务、CRM-011 订单支付退款对账发票与 CRM-012 会员充值次卡套餐共享授权接口）
 
 ## 已实现能力与明确未包含
 
@@ -541,7 +580,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 - Maven 多模块工程、统一响应与异常处理、traceId 透传
 - Actuator 健康检查、就绪/存活探针、Prometheus 指标端点
-- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务 + V11 订单支付退款对账）
+- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务 + V11 订单支付退款对账 + V12 会员充值次卡套餐）
 - JWT 无状态认证、刷新令牌轮换与复用检测、登录失败锁定
 - 用户、组织、角色、权限管理，RBAC + 五级数据范围（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）
 - 客户档案 CRUD、AES-256-GCM 敏感字段加密、HMAC 哈希检索、脱敏展示与敏感权限控制
@@ -558,26 +597,27 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 陪诊服务：陪诊师档案与资质管理、排班重叠冲突阻止、订单派单五重校验（启用/资质/排班覆盖/时段冲突）、状态机流转与拒绝退回、履约起止计时、完成评价与评分聚合
 - 上门服务：项目目录审核链（草稿→待审→发布/驳回方可下单）、客户服务地址簿（默认位唯一）、人员资质库、派单与接单双重资质拦截、执行记录、异常上报/升级/处置闭环与未处置异常阻止完成
 - 订单与收银：服务端重算金额的统一订单、支付单与渠道回调（HMAC-SHA256 验签、重复回调幂等回放不重复入账）、多次部分退款与条件更新防超退、渠道对账批次与差异明细、发票申请/开具/红冲与可开票净额控制；`PaymentGateway` / `ChannelStatementProvider` / `InvoiceProvider` 均为可替换抽象，CRM 收费不写 HIS 收费表
-- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常与订单/支付/退款/对账/发票），支持按动作、资源、时间与数据范围查询
-- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、标签、用户/角色/组织/审计管理页面
+- 会员与权益：会员等级与折扣、储值余额与冻结金额、积分增减与按门槛自动升级、次卡购买/扣次/返还（条件更新防超扣）、套餐目录与三种套餐类型、家庭共享授权与代付、订单退款按规则返还权益；余额与积分每次变动写账本
+- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常、订单/支付/退款/对账/发票与会员开户/充值/消费/积分/套餐/次卡/共享/退款返还），支持按动作、资源、时间与数据范围查询
+- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
 - Docker Compose 开发环境与 GitHub Actions CI
 
 明确未包含（按任务逐步交付）：
 
-- 会员套餐、储值充值、随访、投诉等业务模块（CRM-012 及后续任务）
+- 随访、投诉、客服、商保等业务模块（CRM-013 及后续任务）
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
 > **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-011）
+## 本地验证记录（CRM-001 ~ CRM-012）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
-| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（251 个测试执行，240 通过、11 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个、订单与收银测试 43 个） |
+| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（285 个测试执行，272 通过、13 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个、订单与收银测试 43 个、会员测试 32 个） |
 | 后端可执行包 | `mvnw.cmd -DskipTests package` | 生成 `crm-boot/target/crm-api.jar` |
-| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V11 + 启动 jar | 通过，启动日志从 `10` 增量迁移到 `11`，`flyway_schema_history` 最新版本为 `11:true`，健康检查返回 `UP` |
+| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V12 + 启动 jar | 通过，启动日志从 `11` 增量迁移到 `12`，`flyway_schema_history` 最新版本为 `12:true`，健康检查返回 `UP` |
 | CRM-007 V7 迁移内容 | 查询 `information_schema` / `crm_source_channel` / `sys_permission` | 8 张新表、3 个业务号序列、7 条渠道种子、10 项权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
 | 重复线索核验 | 相同手机号连续创建线索，再带 `forceCreate=true` 创建 | 首次 200；重复创建返回 409 `BUSINESS_CONFLICT` 并提示既有线索号；强制创建 200；`/leads/duplicates` 返回 2 条疑似线索 |
 | 线索转客户追溯 | 新建客户转化 + 关联既有客户转化 | `NEW_CUSTOMER` 与 `EXISTING_CUSTOMER` 均写入 `crm_lead_conversion`，`/leads/{id}/conversion` 返回线索 ID 与客户号；客户已存在时返回 422 并提示改为关联 |
@@ -632,13 +672,23 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 发票与渠道对账 | 申请 100 → 开具 → 红冲；执行渠道对账并查差异明细 | 状态 `APPLIED`→`ISSUED`→`VOID`；全额退款后开票 422；对账批次 `DIFF` 并逐笔标记 `LOCAL_ONLY`，stub 不伪造渠道数据 |
 | 收银不写 HIS 收费表 | 检查 `crm-order/pom.xml` 依赖与调用 | 仅依赖 `crm-system`、`crm-customer`，无 `crm-his` 依赖，不含任何 HIS 写操作 |
 | 收银与订单管理端构建 | `npm run build` | 通过，`OrderView`（订单/支付/退款/对账/发票五标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
+| CRM-012 V12 迁移内容 | 查询 `flyway_schema_history` / `information_schema` / `crm_member_level` / `crm_member_package` / `sys_permission` | 启动日志显示从 `11` 增量迁移到 `12`；等级/套餐/次卡/扣次/共享 5 张表、2 个业务号序列、5 条等级种子、3 条套餐种子与 3 项 `crm:member:*` 权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
+| 并发消费不超扣 | 余额 100 的账户两笔并发 `POST /memberships/consumptions`（各 80.00） | 恰好一个 200、一个 422「账户余额不足」，并发后余额 20.00，未出现负数 |
+| 每次变动有账本 | 充值、消费、积分调整、三类套餐购买、扣次、返还、退款返还后查询 `/accounts/{id}/ledger` | 12 条账本覆盖 `RECHARGE` / `CONSUME` / `POINTS_ADJUST` / `PACKAGE_PURCHASE` / `CARD_CONSUME` / `CARD_REFUND` / `REFUND_REVERSAL` / `CARD_VOID_ON_REFUND`，均记录变动额、积分增减与变动后快照 |
+| 积分与自动升级 | 积分 +1000、扣减 99999、购买积分套餐 | +1000 后升为 `silver`；超扣返回 422「账户积分不足」；购买 5000 分积分套餐后积分 6000 升为 `gold` |
+| 次卡扣次与返还 | 购买 `PKG_TIMES_10` → 扣 3 次 → 返还 3 次 → 重复返还 | 剩余 10→7→10；扣次写 `crm_member_card_usage` 与 `CARD_CONSUME` 账本；重复返还原扣次记录 422「该扣次记录已返还，请勿重复操作」 |
+| 共享授权与代付 | 创建 A→B 余额授权、重复授权、自授权、B 无余额消费 15.00 | 授权 200；重复 409、自授权 422；代付成功且扣减授权人余额至 5.00；无授权时超余额 422 |
+| 套餐维护与停用拦截 | 新建套餐 → 停用 → 购买；购买不存在套餐 | 停用后购买 422「套餐未启用，不能购买」；不存在套餐 404 |
+| 退款权益返还 | 次卡订单退款、充值订单退款 | 次卡订单退款作废 1 张卡并返还剩余 10 次；充值订单退款 20.00 扣回余额 20.00，次卡状态 `VOID` |
+| 会员权限与审计 | 查询 `sys_audit_log` 中 `MEMBER%` | 12 类动作（开户/充值/消费/积分/套餐/次卡/共享/退款返还）均已落库；审计中手机号明文 0 条 |
+| 会员与权益管理端构建 | `npm run build` | 通过，`MemberView`（账户/次卡/套餐/共享授权四标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
 | HIS 未配置 fail-closed | 未配置 `CRM_HIS_*` 调用 search/360/link | 返回 503 统一 JSON，不连接任何 HIS、不伪造数据 |
 | HIS 连接错误 | 启用 HIS 但配置不可达地址 | 返回 502 `UPSTREAM_ERROR`，同步日志记录失败与错误码 |
 | HIS 快照降级 | 预置未过期快照后调用 360 | 返回 200 且 `dataStatus=STALE`、`stale=true`，保留原始来源与获取时间；同步日志记录 `DEGRADED` |
 | HIS 人工核验 | `verified=false` 调用 link | 返回 422，不写入绑定关系 |
 | HIS 注入式输入 | 关键字传 `' or 1=1 --` | 作为普通参数处理，返回 0 条候选，无 SQL 异常 |
 | HIS 同步日志 | 查询 `/api/v1/his/sync-logs` | 分页返回检索/360/绑定记录与失败错误码，未配置 HIS 时仍可查询本地日志 |
-| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 136 个路径、130 个 schema，schema、parameter 与 response 引用全部可解析 |
+| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 154 个路径、144 个 schema，schema、parameter 与 response 引用全部可解析 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI

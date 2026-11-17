@@ -62,6 +62,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:order:read'
   },
   {
+    path: '/members',
+    label: '会员与权益',
+    short: '会',
+    tint: 'linear-gradient(135deg, #b5852f, #d6ab5c)',
+    permission: 'crm:member:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

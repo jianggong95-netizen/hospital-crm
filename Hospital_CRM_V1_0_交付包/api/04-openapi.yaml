@@ -512,6 +512,551 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ServiceOrderResponse" }
+  /memberships/levels:
+    get:
+      tags: [Memberships]
+      summary: 会员等级列表
+      x-required-permission: crm:member:read
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberLevel" }
+  /memberships/accounts:
+    get:
+      tags: [Memberships]
+      summary: 会员账户分页查询
+      x-required-permission: crm:member:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 账户号模糊匹配
+        - in: query
+          name: level
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [active, disabled] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberAccount" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Memberships]
+      summary: 开通会员账户
+      x-required-permission: crm:member:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId]
+              properties:
+                customerId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 开户成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberAccount" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /memberships/accounts/{accountId}:
+    get:
+      tags: [Memberships]
+      summary: 会员账户详情（含有效次卡）
+      x-required-permission: crm:member:read
+      parameters:
+        - in: path
+          name: accountId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberAccountDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /memberships/accounts/{accountId}/ledger:
+    get:
+      tags: [Memberships]
+      summary: 会员账本
+      description: 余额与积分每次变动一条记录，含变动前后快照，支持按账期追溯。
+      x-required-permission: crm:member:read
+      parameters:
+        - in: path
+          name: accountId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberLedgerEntry" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /memberships/recharges:
+    post:
+      tags: [Memberships]
+      summary: 会员充值
+      description: 条件更新累加余额并写 RECHARGE 账本；账户停用返回 422。
+      x-required-permission: crm:member:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId, amount]
+              properties:
+                accountId: { type: string, format: uuid }
+                amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+                orderId: { type: string, format: uuid, nullable: true }
+                reason: { type: string, maxLength: 200, nullable: true }
+      responses:
+        "200":
+          description: 充值成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberAccount" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/consumptions:
+    post:
+      tags: [Memberships]
+      summary: 会员余额消费
+      description: 余额扣减使用条件更新（balance >= amount），并发消费不会超扣；允许共享时可由已授权家庭成员账户代付。
+      x-required-permission: crm:member:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, amount]
+              properties:
+                customerId: { type: string, format: uuid }
+                amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+                bizType: { type: string, maxLength: 32, nullable: true }
+                bizNo: { type: string, maxLength: 64, nullable: true }
+                allowShared: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 消费成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberAccount" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/points/adjustments:
+    post:
+      tags: [Memberships]
+      summary: 积分调整
+      description: 正数增加、负数扣减；扣减条件更新（points >= delta），积分变动后按门槛自动升级等级。
+      x-required-permission: crm:member:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId, points]
+              properties:
+                accountId: { type: string, format: uuid }
+                points: { type: integer, format: int64, description: "正数增加，负数扣减" }
+                reason: { type: string, maxLength: 200, nullable: true }
+      responses:
+        "200":
+          description: 调整成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberAccount" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/refund-reversals:
+    post:
+      tags: [Memberships]
+      summary: 订单退款返还会员权益
+      description: 充值按退款金额扣回余额（不超过当前余额）；套餐次卡作废并返还剩余次数；套餐积分按退款比例扣回；每次扣回写 REVERSAL 账本。
+      x-required-permission: crm:member:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, refundAmount]
+              properties:
+                orderId: { type: string, format: uuid }
+                refundAmount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+      responses:
+        "200":
+          description: 返还完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberRefundReversalResult" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /memberships/packages:
+    get:
+      tags: [Memberships]
+      summary: 套餐目录
+      x-required-permission: crm:member:read
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberPackage" }
+    post:
+      tags: [Memberships]
+      summary: 新建套餐
+      x-required-permission: crm:member:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberPackageCreate" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberPackage" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/packages/{packageCode}:
+    put:
+      tags: [Memberships]
+      summary: 编辑套餐
+      x-required-permission: crm:member:manage
+      parameters:
+        - in: path
+          name: packageCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberPackageUpdate" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberPackage" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /memberships/packages/{packageCode}/status:
+    put:
+      tags: [Memberships]
+      summary: 启停套餐
+      x-required-permission: crm:member:manage
+      parameters:
+        - in: path
+          name: packageCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberPackage" }
+  /memberships/packages/{packageCode}/purchase:
+    post:
+      tags: [Memberships]
+      summary: 购买套餐
+      description: TIMES 生成次卡（含有效期），BALANCE 入余额，POINTS 入积分；仅启用套餐可购买，权益发放写 PACKAGE_PURCHASE 账本。
+      x-required-permission: crm:member:write
+      parameters:
+        - in: path
+          name: packageCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId]
+              properties:
+                customerId: { type: string, format: uuid }
+                orderId: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: 购买成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberPurchaseResult" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/cards:
+    get:
+      tags: [Memberships]
+      summary: 次卡分页查询
+      x-required-permission: crm:member:read
+      parameters:
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [ACTIVE, EXHAUSTED, EXPIRED, VOID] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberCard" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /memberships/cards/{cardId}:
+    get:
+      tags: [Memberships]
+      summary: 次卡详情（含扣次记录）
+      x-required-permission: crm:member:read
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberCardDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /memberships/cards/{cardId}/consumptions:
+    post:
+      tags: [Memberships]
+      summary: 次卡扣次
+      description: 条件更新（remaining_times >= times）保证并发扣次不超扣；每次扣次写扣次记录与会员账本。
+      x-required-permission: crm:member:write
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [times]
+              properties:
+                times: { type: integer, minimum: 1 }
+                bizType: { type: string, maxLength: 32, nullable: true }
+                bizNo: { type: string, maxLength: 64, nullable: true }
+                remark: { type: string, maxLength: 500, nullable: true }
+      responses:
+        "200":
+          description: 扣次成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberCard" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/cards/{cardId}/refunds:
+    post:
+      tags: [Memberships]
+      summary: 次卡返还次数
+      description: 指定扣次记录时将该记录置 REFUNDED，重复返返回 422；返还后回补剩余次数并写账本。
+      x-required-permission: crm:member:write
+      parameters:
+        - in: path
+          name: cardId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [times]
+              properties:
+                times: { type: integer, minimum: 1 }
+                usageId: { type: string, format: uuid, nullable: true }
+                reason: { type: string, maxLength: 500, nullable: true }
+      responses:
+        "200":
+          description: 返还成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberCard" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/shares:
+    get:
+      tags: [Memberships]
+      summary: 共享授权查询
+      x-required-permission: crm:member:read
+      parameters:
+        - in: query
+          name: ownerCustomerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: beneficiaryCustomerId
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MemberShare" }
+    post:
+      tags: [Memberships]
+      summary: 新建共享授权
+      x-required-permission: crm:member:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ownerCustomerId, beneficiaryCustomerId, resourceType]
+              properties:
+                ownerCustomerId: { type: string, format: uuid }
+                beneficiaryCustomerId: { type: string, format: uuid }
+                resourceType: { type: string, enum: [BALANCE, POINTS, CARD] }
+                resourceId: { type: string, format: uuid, nullable: true }
+                validTo: { type: string, format: date-time, nullable: true }
+                canConsume: { type: boolean, default: true }
+      responses:
+        "200":
+          description: 授权成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberShare" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /memberships/shares/{shareId}/revoke:
+    put:
+      tags: [Memberships]
+      summary: 撤销共享授权
+      x-required-permission: crm:member:write
+      parameters:
+        - in: path
+          name: shareId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 撤销成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemberShare" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
   /orders:
     get:
       tags: [Orders]
@@ -4876,6 +5421,176 @@ components:
             orderNo: { type: string }
             status: { type: string }
         traceId: { type: string }
+    MemberLevel:
+      type: object
+      description: 会员等级；discountRate 为应收折扣率，sortNo 越小等级越高。
+      properties:
+        levelCode: { type: string }
+        levelName: { type: string }
+        minPoints: { type: integer, format: int64 }
+        discountRate: { type: string, description: "十进制折扣率字符串" }
+        sortNo: { type: integer }
+    MemberAccount:
+      type: object
+      description: 会员账户；余额与积分变动一律经账本记录。
+      properties:
+        id: { type: string, format: uuid }
+        accountNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        memberLevel: { type: string }
+        levelName: { type: string, nullable: true }
+        discountRate: { type: string, nullable: true }
+        balance: { type: string, description: "可用余额（十进制字符串）" }
+        frozenBalance: { type: string }
+        points: { type: integer, format: int64 }
+        status: { type: string, enum: [active, disabled] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MemberCardSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        cardNo: { type: string }
+        packageCode: { type: string }
+        packageName: { type: string, nullable: true }
+        totalTimes: { type: integer }
+        usedTimes: { type: integer }
+        remainingTimes: { type: integer }
+        validFrom: { type: string, format: date }
+        validTo: { type: string, format: date }
+        status: { type: string, enum: [ACTIVE, EXHAUSTED, EXPIRED, VOID] }
+    MemberAccountDetail:
+      type: object
+      properties:
+        account: { $ref: "#/components/schemas/MemberAccount" }
+        cards:
+          type: array
+          description: 该账户客户的有效次卡
+          items: { $ref: "#/components/schemas/MemberCardSummary" }
+    MemberLedgerEntry:
+      type: object
+      description: 会员账本条目；ledgerType 含 RECHARGE/CONSUME/POINTS_ADJUST/PACKAGE_PURCHASE/CARD_CONSUME/CARD_REFUND/REFUND_REVERSAL/CARD_VOID_ON_REFUND。
+      properties:
+        id: { type: string, format: uuid }
+        ledgerType: { type: string }
+        amount: { type: string, description: "余额变动，正增负减" }
+        pointsDelta: { type: integer, format: int64 }
+        balanceAfter: { type: string, nullable: true }
+        pointsAfter: { type: integer, format: int64, nullable: true }
+        relatedOrderId: { type: string, format: uuid, nullable: true }
+        bizNo: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    MemberRefundReversalResult:
+      type: object
+      description: 订单退款后的会员权益返还结果。
+      properties:
+        orderId: { type: string, format: uuid }
+        balanceReversed: { type: string }
+        pointsReversed: { type: integer, format: int64 }
+        cardsVoided: { type: integer }
+        cardTimesReturned: { type: integer }
+    MemberPackage:
+      type: object
+      description: 会员套餐；packageType 为 TIMES/BALANCE/POINTS，载荷字段按类型生效。
+      properties:
+        packageCode: { type: string }
+        packageName: { type: string }
+        packageType: { type: string, enum: [TIMES, BALANCE, POINTS] }
+        price: { type: string }
+        times: { type: integer, nullable: true }
+        balanceAmount: { type: string, nullable: true }
+        pointsAmount: { type: integer, format: int64, nullable: true }
+        validDays: { type: integer, nullable: true }
+        status: { type: string, enum: [active, disabled] }
+        description: { type: string, nullable: true }
+    MemberPackageCreate:
+      type: object
+      required: [packageCode, packageName, packageType, price]
+      properties:
+        packageCode: { type: string, pattern: "^[A-Za-z0-9_]{2,32}$" }
+        packageName: { type: string, maxLength: 120 }
+        packageType: { type: string, enum: [TIMES, BALANCE, POINTS] }
+        price: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+        times: { type: integer, minimum: 1, nullable: true, description: "TIMES 套餐必填" }
+        balanceAmount: { type: string, nullable: true, description: "BALANCE 套餐必填" }
+        pointsAmount: { type: integer, format: int64, nullable: true, description: "POINTS 套餐必填" }
+        validDays: { type: integer, minimum: 1, nullable: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    MemberPackageUpdate:
+      type: object
+      required: [packageName, price]
+      properties:
+        packageName: { type: string, maxLength: 120 }
+        price: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+        times: { type: integer, minimum: 1, nullable: true }
+        balanceAmount: { type: string, nullable: true }
+        pointsAmount: { type: integer, format: int64, nullable: true }
+        validDays: { type: integer, minimum: 1, nullable: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    MemberPurchaseResult:
+      type: object
+      properties:
+        account: { $ref: "#/components/schemas/MemberAccount" }
+        card:
+          allOf:
+            - $ref: "#/components/schemas/MemberCardSummary"
+          nullable: true
+          description: TIMES 套餐生成的次卡，其余类型为空
+        balanceAdded: { type: string }
+        pointsAdded: { type: integer, format: int64 }
+    MemberCard:
+      type: object
+      description: 会员次卡；扣次使用 remaining_times >= times 条件更新，并发不超扣。
+      properties:
+        id: { type: string, format: uuid }
+        cardNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        packageCode: { type: string }
+        packageName: { type: string, nullable: true }
+        totalTimes: { type: integer }
+        usedTimes: { type: integer }
+        remainingTimes: { type: integer }
+        validFrom: { type: string, format: date }
+        validTo: { type: string, format: date }
+        status: { type: string, enum: [ACTIVE, EXHAUSTED, EXPIRED, VOID] }
+        sourceOrderId: { type: string, format: uuid, nullable: true }
+    MemberCardUsage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        times: { type: integer }
+        bizType: { type: string, nullable: true }
+        bizNo: { type: string, nullable: true }
+        status: { type: string, enum: [CONSUMED, REFUNDED] }
+        remark: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        refundedAt: { type: string, format: date-time, nullable: true }
+    MemberCardDetail:
+      type: object
+      properties:
+        card: { $ref: "#/components/schemas/MemberCard" }
+        usages:
+          type: array
+          items: { $ref: "#/components/schemas/MemberCardUsage" }
+    MemberShare:
+      type: object
+      description: 会员权益共享授权；授权人与使用人不能为同一客户。
+      properties:
+        id: { type: string, format: uuid }
+        ownerCustomerId: { type: string, format: uuid }
+        ownerCustomerName: { type: string, nullable: true }
+        beneficiaryCustomerId: { type: string, format: uuid }
+        beneficiaryCustomerName: { type: string, nullable: true }
+        resourceType: { type: string, enum: [BALANCE, POINTS, CARD] }
+        resourceId: { type: string, format: uuid, nullable: true }
+        canConsume: { type: boolean }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [ACTIVE, REVOKED, EXPIRED] }
+        createdAt: { type: string, format: date-time }
     OrderCreate:
       type: object
       required: [customerId, orderType, items]

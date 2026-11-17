@@ -64,6 +64,12 @@ const router = createRouter({
           meta: { title: '收银与订单', permission: 'crm:order:read' }
         },
         {
+          path: 'members',
+          name: 'members',
+          component: () => import('@/views/member/MemberView.vue'),
+          meta: { title: '会员与权益', permission: 'crm:member:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

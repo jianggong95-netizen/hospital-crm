@@ -30,6 +30,7 @@
     <module>crm-escort</module>
     <module>crm-homevisit</module>
     <module>crm-order</module>
+    <module>crm-member</module>
     <module>crm-boot</module>
   </modules>
 
