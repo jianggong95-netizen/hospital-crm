@@ -15,6 +15,7 @@ tags:
   - name: Families
   - name: HIS
   - name: Operation
+  - name: Appointment
   - name: Service
   - name: Orders
   - name: Followups
@@ -1830,6 +1831,486 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/OperationParticipant" }
 
+  /appointment-types:
+    get:
+      tags: [Appointment]
+      summary: 预约类型列表
+      x-required-permission: crm:appttype:read
+      parameters:
+        - in: query
+          name: includeDisabled
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AppointmentType" }
+    post:
+      tags: [Appointment]
+      summary: 新建预约类型
+      x-required-permission: crm:appttype:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [typeCode, typeName]
+              properties:
+                typeCode: { type: string, pattern: "^[A-Z0-9_]{2,64}$" }
+                typeName: { type: string, maxLength: 100 }
+                durationMinutes: { type: integer, minimum: 1, maximum: 480, default: 30 }
+                cancelCutoffHours: { type: integer, minimum: 0, maximum: 720, default: 2 }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentType" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /appointment-types/{typeCode}:
+    put:
+      tags: [Appointment]
+      summary: 更新预约类型
+      x-required-permission: crm:appttype:write
+      parameters:
+        - $ref: "#/components/parameters/TypeCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [typeName]
+              properties:
+                typeName: { type: string, maxLength: 100 }
+                durationMinutes: { type: integer, minimum: 1, maximum: 480 }
+                cancelCutoffHours: { type: integer, minimum: 0, maximum: 720 }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentType" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /appointment-types/{typeCode}/status:
+    put:
+      tags: [Appointment]
+      summary: 启用或停用预约类型
+      x-required-permission: crm:appttype:write
+      parameters:
+        - $ref: "#/components/parameters/TypeCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentType" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /service-slots:
+    get:
+      tags: [Appointment]
+      summary: 服务时段分页
+      x-required-permission: crm:appttype:read
+      parameters:
+        - in: query
+          name: typeCode
+          required: false
+          schema: { type: string }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [OPEN, CLOSED] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ServiceSlot" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Appointment]
+      summary: 发布服务时段
+      x-required-permission: crm:appttype:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [typeCode, slotDate, startTime, endTime, capacity]
+              properties:
+                typeCode: { type: string }
+                slotDate: { type: string, format: date }
+                startTime: { type: string, format: time }
+                endTime: { type: string, format: time }
+                capacity: { type: integer, minimum: 1, maximum: 500 }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ServiceSlot" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /service-slots/{slotId}:
+    put:
+      tags: [Appointment]
+      summary: 调整服务时段
+      description: 已有预约的时段不允许修改日期或时间；容量不得小于已约人数。
+      x-required-permission: crm:appttype:write
+      parameters:
+        - $ref: "#/components/parameters/SlotId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotDate, startTime, endTime, capacity]
+              properties:
+                slotDate: { type: string, format: date }
+                startTime: { type: string, format: time }
+                endTime: { type: string, format: time }
+                capacity: { type: integer, minimum: 1, maximum: 500 }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ServiceSlot" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /service-slots/{slotId}/status:
+    put:
+      tags: [Appointment]
+      summary: 开放或关闭服务时段
+      x-required-permission: crm:appttype:write
+      parameters:
+        - $ref: "#/components/parameters/SlotId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [OPEN, CLOSED] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ServiceSlot" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /appointments:
+    get:
+      tags: [Appointment]
+      summary: 预约分页查询
+      x-required-permission: crm:appointment:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 预约单号模糊匹配
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [BOOKED, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW] }
+        - in: query
+          name: typeCode
+          required: false
+          schema: { type: string }
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Appointment" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Appointment]
+      summary: 创建预约
+      description: 通过时段名额条件更新占用容量，并发下不会超卖；同一客户同一时段的有效预约唯一。
+      x-required-permission: crm:appointment:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, typeCode, slotId]
+              properties:
+                customerId: { type: string, format: uuid }
+                typeCode: { type: string }
+                slotId: { type: string, format: uuid }
+                contactPhone: { type: string, maxLength: 32 }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Appointment" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /appointments/{appointmentId}:
+    get:
+      tags: [Appointment]
+      summary: 预约详情
+      x-required-permission: crm:appointment:read
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /appointments/{appointmentId}/reschedule:
+    put:
+      tags: [Appointment]
+      summary: 预约改期
+      description: 目标时段占用成功后释放原时段；受预约类型提前小时数截止规则约束。
+      x-required-permission: crm:appointment:write
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotId]
+              properties:
+                slotId: { type: string, format: uuid }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 改期成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Appointment" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /appointments/{appointmentId}/cancel:
+    put:
+      tags: [Appointment]
+      summary: 取消预约
+      description: 必须在“时段开始 - 取消提前小时数”之前操作，取消后释放容量并撤销未发送提醒。
+      x-required-permission: crm:appointment:write
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Appointment" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /appointments/{appointmentId}/status:
+    put:
+      tags: [Appointment]
+      summary: 确认、完成或标记爽约
+      description: 状态机 BOOKED→CONFIRMED→COMPLETED/CANCELLED/NO_SHOW；标记爽约将生成爽约记录。
+      x-required-permission: crm:appointment:manage
+      parameters:
+        - $ref: "#/components/parameters/AppointmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [CONFIRMED, COMPLETED, NO_SHOW] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Appointment" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+
+  /appointment-reminders/dispatch:
+    post:
+      tags: [Appointment]
+      summary: 手工触发到期提醒发送
+      description: 与定时任务同一逻辑；发送失败的提醒按指数退避自动重试，达到上限后仅可人工重试。
+      x-required-permission: crm:appointment:manage
+      responses:
+        "200":
+          description: 执行完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentDispatchResult" }
+  /appointment-reminders/{reminderId}/retry:
+    post:
+      tags: [Appointment]
+      summary: 人工重试单条提醒
+      x-required-permission: crm:appointment:manage
+      parameters:
+        - $ref: "#/components/parameters/ReminderId"
+      responses:
+        "200":
+          description: 重试完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/AppointmentReminder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+
+  /no-shows:
+    get:
+      tags: [Appointment]
+      summary: 爽约记录分页
+      x-required-permission: crm:appointment:read
+      parameters:
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/NoShowRecord" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1875,6 +2356,26 @@ components:
     ParticipantId:
       in: path
       name: participantId
+      required: true
+      schema: { type: string, format: uuid }
+    TypeCode:
+      in: path
+      name: typeCode
+      required: true
+      schema: { type: string }
+    SlotId:
+      in: path
+      name: slotId
+      required: true
+      schema: { type: string, format: uuid }
+    AppointmentId:
+      in: path
+      name: appointmentId
+      required: true
+      schema: { type: string, format: uuid }
+    ReminderId:
+      in: path
+      name: reminderId
       required: true
       schema: { type: string, format: uuid }
     Page:
@@ -3010,4 +3511,94 @@ components:
         registeredAt: { type: string, format: date-time }
         checkedInAt: { type: string, format: date-time }
         remark: { type: string }
+    AppointmentType:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        typeCode: { type: string }
+        typeName: { type: string }
+        durationMinutes: { type: integer }
+        cancelCutoffHours: { type: integer, description: "取消/改期需在时段开始前该小时数之前操作" }
+        status: { type: string, enum: [active, disabled] }
+        remark: { type: string }
+        createdAt: { type: string, format: date-time }
+    ServiceSlot:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        typeCode: { type: string }
+        typeName: { type: string }
+        slotDate: { type: string, format: date }
+        startTime: { type: string, format: time }
+        endTime: { type: string, format: time }
+        capacity: { type: integer }
+        bookedCount: { type: integer }
+        remaining: { type: integer }
+        status: { type: string, enum: [OPEN, CLOSED] }
+        remark: { type: string }
+        updatedAt: { type: string, format: date-time }
+    Appointment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        appointmentNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerNo: { type: string }
+        customerName: { type: string }
+        typeCode: { type: string }
+        typeName: { type: string }
+        slotId: { type: string, format: uuid }
+        slotDate: { type: string, format: date }
+        startTime: { type: string, format: time }
+        endTime: { type: string, format: time }
+        status: { type: string, enum: [BOOKED, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW] }
+        contactPhoneMasked: { type: string }
+        createdAt: { type: string, format: date-time }
+    AppointmentDetail:
+      type: object
+      properties:
+        summary: { $ref: "#/components/schemas/Appointment" }
+        remark: { type: string }
+        cancelledAt: { type: string, format: date-time }
+        cancelReason: { type: string }
+        completedAt: { type: string, format: date-time }
+        noShowAt: { type: string, format: date-time }
+        noShowCount: { type: integer, format: int64, description: "该客户历史爽约次数" }
+        reminders:
+          type: array
+          items: { $ref: "#/components/schemas/AppointmentReminder" }
+    AppointmentReminder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        appointmentId: { type: string, format: uuid }
+        appointmentNo: { type: string }
+        channel: { type: string, enum: [sms, wechat, phone] }
+        plannedAt: { type: string, format: date-time }
+        status: { type: string, enum: [PENDING, SENT, FAILED, CANCELLED] }
+        retryCount: { type: integer }
+        maxRetries: { type: integer }
+        nextRetryAt: { type: string, format: date-time }
+        lastError: { type: string }
+        sentAt: { type: string, format: date-time }
+    AppointmentDispatchResult:
+      type: object
+      properties:
+        scanned: { type: integer }
+        sent: { type: integer }
+        failed: { type: integer }
+        dispatchedAt: { type: string, format: date-time }
+    NoShowRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        appointmentId: { type: string, format: uuid }
+        appointmentNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerNo: { type: string }
+        customerName: { type: string }
+        appointmentAt: { type: string, format: date-time }
+        reason: { type: string }
+        recordedByName: { type: string }
+        createdAt: { type: string, format: date-time }
 

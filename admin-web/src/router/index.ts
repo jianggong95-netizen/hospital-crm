@@ -40,6 +40,12 @@ const router = createRouter({
           meta: { title: '客户运营', permission: 'crm:lead:read' }
         },
         {
+          path: 'appointments',
+          name: 'appointments',
+          component: () => import('@/views/appointment/AppointmentView.vue'),
+          meta: { title: '预约中心', permission: 'crm:appointment:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

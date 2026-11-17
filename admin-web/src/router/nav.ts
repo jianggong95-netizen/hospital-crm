@@ -34,6 +34,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:lead:read'
   },
   {
+    path: '/appointments',
+    label: '预约中心',
+    short: '约',
+    tint: 'linear-gradient(135deg, #3c6e9e, #6f9ec5)',
+    permission: 'crm:appointment:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

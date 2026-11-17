@@ -13,32 +13,32 @@ export const phases: Phase[] = [
     key: 'P0',
     name: '项目底座与安全',
     focus: '工程骨架、登录权限、组织、审计、配置、CI',
-    status: 'active',
+    status: 'done',
     tasks: [
       'CRM-001 项目初始化（已完成）',
-      'CRM-002 认证、组织、角色、权限'
+      'CRM-002 认证、组织、角色、权限（已完成）'
     ]
   },
   {
     key: 'P1',
     name: '客户与 HIS',
     focus: '客户档案、家庭账户、HIS 适配、患者 360',
-    status: 'planned',
+    status: 'done',
     tasks: [
-      'CRM-003 客户中心',
-      'CRM-004 家庭账户',
-      'CRM-005 HIS SQL Server 适配器',
-      'CRM-006 患者 360'
+      'CRM-003 客户中心（已完成）',
+      'CRM-004 家庭账户（已完成）',
+      'CRM-005 HIS SQL Server 适配器（已完成）',
+      'CRM-006 患者 360（已完成）'
     ]
   },
   {
     key: 'P2',
     name: '服务交易',
     focus: '邀约分诊、预约、陪诊、上门服务、订单支付',
-    status: 'planned',
+    status: 'active',
     tasks: [
-      'CRM-007 客户运营、邀约与分诊',
-      'CRM-008 预约中心',
+      'CRM-007 客户运营、邀约与分诊（已完成）',
+      'CRM-008 预约中心（已完成）',
       'CRM-009 陪诊服务',
       'CRM-010 上门服务',
       'CRM-011 订单、收费、支付与退款',

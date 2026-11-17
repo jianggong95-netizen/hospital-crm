@@ -26,6 +26,7 @@
     <module>crm-his</module>
     <module>crm-patient360</module>
     <module>crm-operation</module>
+    <module>crm-appointment</module>
     <module>crm-boot</module>
   </modules>
 
