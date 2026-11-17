@@ -258,9 +258,49 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void escortMigrationCreatesEscortScheduleAndOrderTables() {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema = 'public' "
+                        + "and table_name in ('crm_escort','crm_escort_qualification','crm_escort_schedule',"
+                        + "'crm_escort_order','crm_escort_review')",
+                Integer.class);
+        assertEquals(5, tableCount);
+
+        Integer escortIndexes = jdbcTemplate.queryForObject(
+                "select count(*) from pg_indexes where schemaname = 'public' "
+                        + "and indexname in ('uq_schedule_escort_date_start','uq_review_order')",
+                Integer.class);
+        assertEquals(2, escortIndexes);
+
+        Integer escortSequences = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.sequences where sequence_schema = 'public' "
+                        + "and sequence_name in ('crm_escort_no_seq','crm_escort_order_no_seq')",
+                Integer.class);
+        assertEquals(2, escortSequences);
+
+        Integer escortPermissions = jdbcTemplate.queryForObject(
+                "select count(*) from sys_permission where permission_code in "
+                        + "('crm:escort:read','crm:escort:write','crm:escortorder:read',"
+                        + "'crm:escortorder:write','crm:escortorder:manage')",
+                Integer.class);
+        assertEquals(5, escortPermissions);
+
+        Integer granted = jdbcTemplate.queryForObject(
+                "select count(*) from sys_role_permission rp "
+                        + "join sys_role r on r.id = rp.role_id "
+                        + "join sys_permission p on p.id = rp.permission_id "
+                        + "where r.role_code = 'SUPER_ADMIN' and p.permission_code like 'crm:%'",
+                Integer.class);
+        Integer crmPermissions = jdbcTemplate.queryForObject(
+                "select count(*) from sys_permission where permission_code like 'crm:%'",
+                Integer.class);
+        assertEquals(crmPermissions, granted);
+    }
+
+    @Test
     void appliedMigrationsIncludeSystemAuthScript() {
         Integer appliedMigrations = jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where success = true", Integer.class);
-        assertTrue(appliedMigrations != null && appliedMigrations >= 8);
+        assertTrue(appliedMigrations != null && appliedMigrations >= 9);
     }
 }

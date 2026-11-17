@@ -55,6 +55,16 @@
       <artifactId>crm-appointment</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.hospital.crm</groupId>
+      <artifactId>crm-escort</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.hospital.crm</groupId>
+      <artifactId>crm-homevisit</artifactId>
+      <version>${project.version}</version>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

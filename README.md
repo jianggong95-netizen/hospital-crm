@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊** 与 **CRM-008 预约中心**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务** 与 **CRM-010 上门服务**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、Docker 开发环境、数据库迁移与 CI。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -23,11 +23,13 @@
 - [患者 360（CRM-006）](#患者-360crm-006)
 - [客户运营、邀约与分诊（CRM-007）](#客户运营邀约与分诊crm-007)
 - [预约中心（CRM-008）](#预约中心crm-008)
+- [陪诊服务（CRM-009）](#陪诊服务crm-009)
+- [上门服务（CRM-010）](#上门服务crm-010)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-008）](#本地验证记录crm-001--crm-008)
+- [本地验证记录（CRM-001 ~ CRM-010）](#本地验证记录crm-001--crm-010)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -58,10 +60,12 @@
 │  ├─ crm-patient360/            # 患者 360（CRM 与 HIS 聚合、字段权限、分页与短时缓存）
 │  ├─ crm-operation/             # 客户运营（来源渠道、线索、联系记录、分派、转化追溯、邀约、活动）
 │  ├─ crm-appointment/           # 预约中心（预约类型、服务时段、预约与改期取消、提醒重试、爽约记录）
+│  ├─ crm-escort/                # 陪诊服务（陪诊师档案与资质、排班防冲突、派单校验、履约计时、评价）
+│  ├─ crm-homevisit/             # 上门服务（项目目录与审核、服务地址、人员资质、订单派单、执行记录、异常上报与升级）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -251,6 +255,46 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 
 > 上线提示：V8 中上述 5 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；默认提醒实现为日志通道（`LoggingAppointmentNotifier`），接入真实短信 / 微信通道需实现 `AppointmentNotifier` 接口并注册为组件。
 
+## 陪诊服务（CRM-009）
+
+`crm-escort` 模块覆盖陪诊服务全生命周期（陪诊师档案、资质、排班、派单、接单、履约计时、评价），写操作均受 RBAC 权限控制，陪诊师与订单联系电话沿用客户中心加密与脱敏规则：
+
+- **陪诊师档案**：`GET/POST /api/v1/escorts`、`GET /{escortId}`、`PUT /{escortId}`、`PUT /{escortId}/status`；陪诊号 `ES100000+` 取自数据库序列；服务区域为标签列表；支持启停，停用后不可被派单。
+- **资质管理**：`POST /api/v1/escorts/{escortId}/qualifications`、`PUT /api/v1/escorts/{escortId}/qualifications/{qualificationId}/revoke`；类型 `nurse/caregiver/health_manager/other`，含证书号、发证日期与可选到期日；到期日早于服务日期或已停用的资质不满足派单条件。
+- **排班**：`GET/POST /api/v1/escort-schedules`、`PUT /{scheduleId}`、`DELETE /{scheduleId}`；同一陪诊师同一日期时间段重叠返回 409「排班与已有班次重叠」（更新时排除自身），数据库唯一索引 `(escort_id, work_date, start_time)` 兜底；过去日期不可排班（422），删除仅允许未来日期班次。
+- **陪诊订单**：`GET/POST /api/v1/escort-orders`、`GET /{orderId}`；订单号 `E100000+`；状态机 `PENDING→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED`，`CANCELLED` 为终态，拒绝（`reject`）退回 `PENDING` 并保留原因；非法流转一律 422。
+- **派单五重校验**：`PUT /{orderId}/dispatch` 要求订单为 `PENDING`，陪诊师存在且启用、持有服务日有效的未过期未停用资质、当日存在覆盖服务时间窗的排班、且该时段无其他活跃订单（`ASSIGNED/ACCEPTED/IN_PROGRESS` 时间重叠），任一不满足返回 422。
+- **履约计时**：`PUT /{orderId}/start` 记录 `actual_start_at`，`PUT /{orderId}/finish` 记录 `actual_end_at` 并计算 `duration_minutes`；服务开始后不可取消（422「服务已开始，请使用完成」）。
+- **评价**：`POST /api/v1/escort-orders/{orderId}/review`（1–5 星 + 内容）仅 `COMPLETED` 订单可评（422），每单一条（重复 409）；`GET /api/v1/escort-reviews` 分页查询（可按陪诊师过滤）；陪诊师列表与详情返回平均分 `avgRating` 与评价数 `reviewCount`。
+- **审计**：档案/资质/排班/订单/评价全部动作写入 `sys_audit_log`（`ESCORT_*`、`ESCORTQUAL_*`、`SCHEDULE_*`、`ESCORTORDER_*`），仅记录业务号，不含手机号明文。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:escort:read` / `crm:escort:write` | 查看 / 管理陪诊师档案、资质与排班 |
+| `crm:escortorder:read` / `crm:escortorder:write` | 查看 / 创建、派单、接单、拒绝订单 |
+| `crm:escortorder:manage` | 开始、完成、取消、评价等履约管理 |
+
+> 上线提示：V9 中上述 5 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；陪诊订单可关联预约（`appointmentId` 可选），但不强制依赖预约中心。
+
+## 上门服务（CRM-010）
+
+`crm-homevisit` 模块覆盖上门服务全链路（项目目录与审核、服务地址、人员资质、订单审核与派单、执行记录、异常上报与升级），写操作均受 RBAC 权限控制，地址联系电话沿用客户中心加密与脱敏规则：
+
+- **服务目录与审核**：`GET/POST /api/v1/home-services`、`PUT /{serviceCode}`、`PUT /{serviceCode}/submit`、`PUT /{serviceCode}/review`、`PUT /{serviceCode}/status`；审核链 `draft→pending_review→published/rejected`，驳回必须填写原因（422），非待审状态不可重复审核（422）；仅 `published` 项目可下单（未发布下单 422「服务不存在或未发布」）；`published↔disabled` 由管理权限启停；V10 预置 HOME_INJECTION（居家注射）、HOME_DRESSING（居家换药）、HOME_CLEANING（居家保洁）三条已发布服务。
+- **服务地址簿**：`GET/POST /api/v1/home-addresses`、`GET/PUT/DELETE /{addressId}`、`PUT /{addressId}/default`；联系电话加密存储；每个客户仅允许一个默认地址（部分唯一索引 `uq_home_address_default` 兜底），设为默认时自动清除旧默认位。
+- **人员资质**：`GET/POST /api/v1/home-staff-qualifications`、`PUT /{staffQualificationId}/revoke`；资质含类型、证书号与有效期，过期或停用即失效。
+- **订单审核与派单**：`GET/POST /api/v1/home-visit-orders`、`GET /{orderId}`、`PUT /{orderId}/review`、`PUT /{orderId}/dispatch`、`accept`、`reject`、`start`、`finish`、`cancel`；订单号 `H100000+`；状态机 `PENDING→APPROVED→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED`，`REJECTED`/`CANCELLED` 为终态，拒绝派单退回 `APPROVED` 并清空派单信息；派单与接单双重资质拦截——服务人员不具备该项目的有效资质返回 422「上门服务人员不具备该项目的有效资质」。
+- **执行记录**：`POST /{orderId}/executions` 仅进行中订单可登记；`start`/`finish` 记录实际起止并计算 `duration_minutes`。
+- **异常上报与升级**：`POST /{orderId}/exceptions` 仅进行中订单可上报（`OPEN`）；`PUT /api/v1/home-visit-exceptions/{exceptionId}/escalate` 升级（`ESCALATED`）、`PUT /{exceptionId}/resolve` 处置（`RESOLVED`）；存在未处置异常时完成订单返回 422「存在未处理的异常上报，请先处置」。
+- **审计**：目录/审核/地址/资质/订单/派单/执行/异常动作写入 `sys_audit_log`（`HOMESVC_*`、`HOMEADDR_*`、`STAFFQUAL_*`、`HV_ORDER_*`、`HV_EXCEPTION_*`），仅记录业务号，不含手机号明文。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:homevisit:read` / `crm:homevisit:write` | 查看 / 管理目录、地址、资质、订单与派单 |
+| `crm:homevisit:manage` | 目录审核与启停、订单审核、异常升级与处置 |
+
+> 上线提示：V10 中上述 3 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；默认地址切换使用 `saveAndFlush` 保证旧行 UPDATE 先于新行 INSERT，避免与部分唯一索引冲突。
+
 ## 健康检查与验收
 
 ```powershell
@@ -398,6 +442,33 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 审计留痕 | `APPT_CREATE/RESCHEDULE/CANCEL/STATUS`、`SLOT_*`、`APPTTYPE_*`、`REMINDER_DISPATCH/RETRY` 均写入 `sys_audit_log`，不含手机号明文 |
 | 数据库迁移 | `V8__appointment.sql` 新增 5 张表、1 个预约号序列、5 条类型种子与 5 项权限，含时段唯一索引与活跃预约部分唯一索引 |
 
+### CRM-009 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 排班冲突被阻止 | 同陪诊师同日重叠班次返回 409「排班与已有班次重叠」；唯一索引 `(escort_id, work_date, start_time)` 兜底；过去日期 422 |
+| 服务时间可追踪 | `start` 记录 `actual_start_at`、`finish` 记录 `actual_end_at` 并计算 `duration_minutes`；详情与列表均返回实际起止与时长 |
+| 订单状态机 | `PENDING→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED`，拒绝退回 `PENDING`，取消仅服务开始前可用（进行中 422）；终态再变更 422 |
+| 派单资质与排班校验 | 无有效资质（过期/停用）422「陪诊师无有效资质」；无覆盖排班 422「陪诊师该服务时段无覆盖排班」；同时段已有活跃订单 422；停用陪诊师 422 |
+| 评价规则 | 仅 `COMPLETED` 可评（422），每单一条（重复 409）；`/escort-reviews` 分页与陪诊师 `avgRating/reviewCount` 聚合正确 |
+| 敏感字段加密 | 陪诊师与订单联系电话仅存 AES-256-GCM 密文 + HMAC 哈希 + 脱敏值，数据库明文模式匹配 0 条 |
+| 审计留痕 | `ESCORT_*`、`ESCORTQUAL_*`、`SCHEDULE_*`、`ESCORTORDER_*` 共 16 类动作写入 `sys_audit_log`，不含手机号明文 |
+| 数据库迁移 | `V9__escort.sql` 新增 5 张表、2 个业务号序列、5 项权限，含排班唯一索引与评价订单唯一索引 |
+
+### CRM-010 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 无资质不能接单 | 派单与接单双重资质校验：无该项目有效资质（缺失/过期/停用）返回 422「上门服务人员不具备该项目的有效资质」；真实无资质账号派单同样被拒 |
+| 审核规则生效 | 目录仅 `pending_review` 可审核；驳回必填原因（422）；终态重复审核 422；未发布（`draft`/`pending_review`/`rejected`/`disabled`）项目下单 422「服务不存在或未发布」 |
+| 异常可升级 | `OPEN→ESCALATED→RESOLVED` 闭环；已解决异常重复处置 422；存在未处置异常时完成订单 422「存在未处理的异常上报，请先处置」 |
+| 订单状态机 | `PENDING→APPROVED→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED`，拒绝派单退回 `APPROVED` 并清空派单信息；非法流转 422 |
+| 默认地址唯一 | 部分唯一索引 `uq_home_address_default` 兜底；切换默认自动清除旧默认位 |
+| 服务时间可追踪 | `start`/`finish` 记录实际起止并计算 `duration_minutes`；执行记录仅进行中订单可登记 |
+| 敏感字段加密 | 地址联系电话仅存 AES-256-GCM 密文 + HMAC 哈希 + 脱敏值，数据库明文模式匹配 0 条 |
+| 审计留痕 | `HOMESVC_*`、`HOMEADDR_*`、`STAFFQUAL_*`、`HV_ORDER_*`、`HV_EXCEPTION_*` 动作写入 `sys_audit_log`，不含手机号明文 |
+| 数据库迁移 | `V10__homevisit.sql` 新增 6 张表、订单号序列、3 条已发布服务种子与 3 项权限，含默认地址部分唯一索引 |
+
 ## 数据库与迁移
 
 - 迁移目录：`backend/crm-boot/src/main/resources/db/migration`
@@ -410,6 +481,8 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-006 新增客户外部身份查询索引与 `crm:patient360:read` 权限，不复制 HIS 临床数据
 - CRM-007 新增 `crm_source_channel`、`crm_lead`、`crm_lead_contact_record`、`crm_lead_assignment`、`crm_lead_conversion`、`crm_invitation`、`crm_activity`、`crm_activity_participant` 及线索/邀约/活动业务号序列与 `crm:channel:*` / `crm:lead:*` / `crm:invitation:*` / `crm:activity:*` 权限
 - CRM-008 新增 `crm_appointment_type`、`crm_service_slot`、`crm_appointment`、`crm_appointment_reminder`、`crm_no_show_record`、预约号序列、5 条类型种子与 `crm:appttype:*` / `crm:appointment:*` 权限；时段容量含数据库级 `CHECK` 约束
+- CRM-009 新增 `crm_escort`、`crm_escort_qualification`、`crm_escort_schedule`、`crm_escort_order`、`crm_escort_review`、陪诊号与订单号序列及 `crm:escort:*` / `crm:escortorder:*` 权限；排班唯一索引与评价订单唯一索引兜底
+- CRM-010 新增 `crm_home_service`、`crm_home_address`、`crm_home_visit_order`、`crm_home_visit_execution`、`crm_home_visit_exception`、`crm_home_staff_qualification`、上门服务订单号序列、3 条已发布服务种子与 `crm:homevisit:*` 权限；默认地址使用部分唯一索引保证每客户唯一
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -420,7 +493,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营与 CRM-008 预约中心接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务与 CRM-010 上门服务接口）
 
 ## 已实现能力与明确未包含
 
@@ -428,7 +501,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 - Maven 多模块工程、统一响应与异常处理、traceId 透传
 - Actuator 健康检查、就绪/存活探针、Prometheus 指标端点
-- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心）
+- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务）
 - JWT 无状态认证、刷新令牌轮换与复用检测、登录失败锁定
 - 用户、组织、角色、权限管理，RBAC + 五级数据范围（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）
 - 客户档案 CRUD、AES-256-GCM 敏感字段加密、HMAC 哈希检索、脱敏展示与敏感权限控制
@@ -442,27 +515,29 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 客户运营：来源渠道字典、线索创建与状态机、重复线索核验与强制建档、联系记录、分派/转派历史、线索合并、线索转客户追溯（新建或关联既有客户）
 - 邀约任务：关联线索/客户、状态机推进、接受后线索同步 `INVITED`；活动运营：创建、发布、报名（名额与手机号去重）、签到/爽约/取消
 - 预约中心：预约类型与服务时段管理、预约创建/改期/取消（截止规则）、条件更新原子占位并发防超卖、提醒定时派发与失败指数退避重试、人工重试、爽约记录与终态锁定
-- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动与预约/时段/提醒），支持按动作、资源、时间与数据范围查询
-- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、标签、用户/角色/组织/审计管理页面
+- 陪诊服务：陪诊师档案与资质管理、排班重叠冲突阻止、订单派单五重校验（启用/资质/排班覆盖/时段冲突）、状态机流转与拒绝退回、履约起止计时、完成评价与评分聚合
+- 上门服务：项目目录审核链（草稿→待审→发布/驳回方可下单）、客户服务地址簿（默认位唯一）、人员资质库、派单与接单双重资质拦截、执行记录、异常上报/升级/处置闭环与未处置异常阻止完成
+- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单与上门服务目录/地址/订单/异常），支持按动作、资源、时间与数据范围查询
+- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
 - Docker Compose 开发环境与 GitHub Actions CI
 
 明确未包含（按任务逐步交付）：
 
-- 服务订单、随访、会员、投诉等业务模块（CRM-009 及后续任务）
+- 订单支付、会员套餐、随访、投诉等业务模块（CRM-011 及后续任务）
 - 支付、退款、会员、随访、客服、商保等业务模块
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
-> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护。订单、随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
+> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截。订单、随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-008）
+## 本地验证记录（CRM-001 ~ CRM-010）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
-| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（117 个测试执行，107 通过、10 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个） |
+| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（207 个测试执行，196 通过、11 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个） |
 | 后端可执行包 | `mvnw.cmd -DskipTests package` | 生成 `crm-boot/target/crm-api.jar` |
-| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1/V2/V3/V4/V5/V6/V7/V8 + 启动 jar | 通过，`flyway_schema_history` 最新版本为 `8:true`，健康检查返回 `UP` |
+| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V10 + 启动 jar | 通过，`flyway_schema_history` 最新版本为 `10:true`，健康检查返回 `UP` |
 | CRM-007 V7 迁移内容 | 查询 `information_schema` / `crm_source_channel` / `sys_permission` | 8 张新表、3 个业务号序列、7 条渠道种子、10 项权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
 | 重复线索核验 | 相同手机号连续创建线索，再带 `forceCreate=true` 创建 | 首次 200；重复创建返回 409 `BUSINESS_CONFLICT` 并提示既有线索号；强制创建 200；`/leads/duplicates` 返回 2 条疑似线索 |
 | 线索转客户追溯 | 新建客户转化 + 关联既有客户转化 | `NEW_CUSTOMER` 与 `EXISTING_CUSTOMER` 均写入 `crm_lead_conversion`，`/leads/{id}/conversion` 返回线索 ID 与客户号；客户已存在时返回 422 并提示改为关联 |
@@ -475,6 +550,19 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 提醒派发与重试 | `POST /appointment-reminders/dispatch`、SENT 提醒人工重试 | dispatch `scanned=1 sent=1`；定时任务自动派发验证通过；SENT 提醒重试返回 422（仅 PENDING/FAILED 可重试，规则正确） |
 | 爽约全流程 | 创建 1 分钟后开始的时段并预约，时段开始后标记 `NO_SHOW` | 200 且状态 `NO_SHOW`；名额不释放（1/1）；`/no-shows` 返回记录、详情 `noShowCount=1`；终态再变更状态返回 422 |
 | 预约手机号加密 | 查询 `crm_appointment` | 仅存 AES-GCM 密文、HMAC 哈希与脱敏值（`139****8001`），明文模式匹配 0 条；审计动作 `APPT_*` / `SLOT_*` / `REMINDER_*` 均已落库 |
+| CRM-009 V9 迁移内容 | 查询 `information_schema` / `sys_permission` | 5 张新表、2 个业务号序列、5 项权限与 `uq_schedule_escort_date_start` / `uq_review_order` 索引均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
+| 排班冲突与日期规则 | 同日重叠班次、过去日期排班 | 重叠返回 409「排班与已有班次重叠」；过去日期返回 422 |
+| 派单五重校验 | 过期资质 / 无排班 / 停用陪诊师 / 同时段已有订单分别派单 | 依次返回 422「陪诊师无有效资质」「陪诊师该服务时段无覆盖排班」「陪诊师该时段已有其他订单」；停用后派单 422 |
+| 订单状态机与拒绝 | 派单后重复派单、拒绝退回、拒绝后再派单、终态再接单 | 非 `PENDING` 派单 422；拒绝退回 `PENDING` 并可再次派单成功；`COMPLETED` 后接单/取消 422 |
+| 履约计时 | 开始→完成 | `start` 记录 `actual_start_at`；进行中取消 422「服务已开始，请使用完成」；`finish` 记录 `actual_end_at` 并计算 `duration_minutes` |
+| 评价规则与评分聚合 | 完成订单评价、重复评价、评价列表 | 评价 200；重复评价 409；`/escort-reviews` 分页返回 2 条；陪诊师详情 `avgRating=5.0` |
+| 陪诊手机号加密 | 查询 `crm_escort` / `crm_escort_order` | 仅存 AES-GCM 密文、HMAC 哈希与脱敏值，明文模式匹配 0 条；审计 16 类动作（`ESCORT_*` / `SCHEDULE_*` / `ESCORTORDER_*`）均已落库 |
+| CRM-010 V10 迁移内容 | 查询 `information_schema` / `crm_home_service` / `sys_permission` | 6 张新表、订单号序列、3 条已发布服务种子、3 项权限与 `uq_home_address_default` 部分唯一索引均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
+| 目录审核链 | 未发布项目下单、驳回不带原因、终态重复审核 | 未发布下单 422「服务不存在或未发布」；驳回缺原因 422；`published` 后再审核 422；审核发布后正常下单 |
+| 资质双重拦截 | 无资质账号派单 / 派单后资质失效再接单 | 派单返回 422「上门服务人员不具备该项目的有效资质」（以真实无资质账号验证）；接单二次校验同样 422 |
+| 异常升级与处置闭环 | 上报异常后完成订单、升级、处置、重复处置 | 未处置异常完成订单 422「存在未处理的异常上报，请先处置」；`OPEN→ESCALATED→RESOLVED` 流转正常；已解决重复处置 422 |
+| 默认地址切换 | 同客户先后设置两个默认地址 | 第二个默认地址 200 且旧默认位自动清除，`uq_home_address_default` 无冲突 |
+| 上门联系电话加密 | 查询 `crm_home_address` | 仅存 AES-GCM 密文、HMAC 哈希与脱敏值，明文模式匹配 0 条；`HOMESVC_*` / `HOMEADDR_*` / `STAFFQUAL_*` / `HV_*` 审计动作均已落库 |
 | 未认证访问 | 未携带令牌请求 `/operation/leads` | 返回 401 统一 JSON |
 | 未认证与越权 | `curl` 访问用户/角色/组织/客户接口 | 未认证返回 401；缺权限返回 403，均为统一 JSON |
 | 数据范围 | 科室管理员账号查询用户列表 | 仅返回本组织成员，越范围用户不可见 |
@@ -495,13 +583,15 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 患者 360 审计与脱敏 | 查询 `sys_audit_log` 中 `PATIENT360_VIEW` | 审计仅含分区状态、`sensitiveVisible`、`hisCached` 与客户号；检索外部患者标识明文数量为 0 |
 | 患者 360 管理端构建 | `npm run build` | 通过，`Patient360View` 路由与页面正常打包 |
 | 预约中心管理端构建 | `npm run build` | 通过，`AppointmentView`（预约/时段/类型/爽约四标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
+| 陪诊服务管理端构建 | `npm run build` | 通过，`EscortView`（订单/陪诊师/排班/评价四标签页）路由与页面正常打包，详情嵌套结构在 api 层拍平适配，`vue-tsc` 类型检查无错误 |
+| 上门服务管理端构建 | `npm run build` | 通过，`HomeVisitView`（订单/目录/地址/资质/异常五标签页）路由与页面正常打包，详情嵌套结构在 api 层拍平适配，`vue-tsc` 类型检查无错误 |
 | HIS 未配置 fail-closed | 未配置 `CRM_HIS_*` 调用 search/360/link | 返回 503 统一 JSON，不连接任何 HIS、不伪造数据 |
 | HIS 连接错误 | 启用 HIS 但配置不可达地址 | 返回 502 `UPSTREAM_ERROR`，同步日志记录失败与错误码 |
 | HIS 快照降级 | 预置未过期快照后调用 360 | 返回 200 且 `dataStatus=STALE`、`stale=true`，保留原始来源与获取时间；同步日志记录 `DEGRADED` |
 | HIS 人工核验 | `verified=false` 调用 link | 返回 422，不写入绑定关系 |
 | HIS 注入式输入 | 关键字传 `' or 1=1 --` | 作为普通参数处理，返回 0 条候选，无 SQL 异常 |
 | HIS 同步日志 | 查询 `/api/v1/his/sync-logs` | 分页返回检索/360/绑定记录与失败错误码，未配置 HIS 时仍可查询本地日志 |
-| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 78 个路径、103 个 schema，schema 与 parameter 引用全部可解析 |
+| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 119 个路径、117 个 schema，schema 与 parameter 引用全部可解析 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI

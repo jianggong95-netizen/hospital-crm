@@ -46,6 +46,18 @@ const router = createRouter({
           meta: { title: '预约中心', permission: 'crm:appointment:read' }
         },
         {
+          path: 'escorts',
+          name: 'escorts',
+          component: () => import('@/views/escort/EscortView.vue'),
+          meta: { title: '陪诊服务', permission: 'crm:escortorder:read' }
+        },
+        {
+          path: 'home-visits',
+          name: 'home-visits',
+          component: () => import('@/views/homevisit/HomeVisitView.vue'),
+          meta: { title: '上门服务', permission: 'crm:homevisit:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

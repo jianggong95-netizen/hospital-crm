@@ -41,6 +41,20 @@ export const navItems: NavItem[] = [
     permission: 'crm:appointment:read'
   },
   {
+    path: '/escorts',
+    label: '陪诊服务',
+    short: '陪',
+    tint: 'linear-gradient(135deg, #8a5cc6, #b08ad9)',
+    permission: 'crm:escortorder:read'
+  },
+  {
+    path: '/home-visits',
+    label: '上门服务',
+    short: '访',
+    tint: 'linear-gradient(135deg, #c96a2b, #dd9457)',
+    permission: 'crm:homevisit:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

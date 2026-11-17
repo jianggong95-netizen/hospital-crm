@@ -16,6 +16,8 @@ tags:
   - name: HIS
   - name: Operation
   - name: Appointment
+  - name: Escort
+  - name: HomeVisit
   - name: Service
   - name: Orders
   - name: Followups
@@ -2311,6 +2313,1382 @@ paths:
                   pageSize: { type: integer }
                   total: { type: integer, format: int64 }
 
+  /escorts:
+    get:
+      tags: [Escort]
+      summary: 陪诊师分页查询
+      description: 返回脱敏手机号与评分聚合，不含手机号明文。
+      x-required-permission: crm:escort:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 陪诊师编号或姓名模糊匹配
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [active, disabled] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Escort" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Escort]
+      summary: 创建陪诊师
+      description: 生成 ES 前缀业务编号；手机号以密文+哈希+脱敏三列存储。
+      x-required-permission: crm:escort:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                gender: { type: string, enum: [unknown, male, female] }
+                phone: { type: string, maxLength: 32 }
+                serviceAreas:
+                  type: array
+                  items: { type: string, maxLength: 50 }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortDetail" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escorts/{escortId}:
+    get:
+      tags: [Escort]
+      summary: 陪诊师详情
+      description: 含资质列表（标记是否过期）与评分聚合。
+      x-required-permission: crm:escort:read
+      parameters:
+        - $ref: "#/components/parameters/EscortId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Escort]
+      summary: 更新陪诊师档案
+      description: 仅更新提交的字段；手机号传空串表示清空三列敏感数据。
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/EscortId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                gender: { type: string, enum: [unknown, male, female] }
+                phone: { type: string, maxLength: 32 }
+                serviceAreas:
+                  type: array
+                  items: { type: string, maxLength: 50 }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /escorts/{escortId}/status:
+    put:
+      tags: [Escort]
+      summary: 启停陪诊师
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/EscortId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /escorts/{escortId}/qualifications:
+    post:
+      tags: [Escort]
+      summary: 登记陪诊师资质
+      description: 同一陪诊师同类型同证书编号唯一。
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/EscortId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qualType, certNo, issuedAt]
+              properties:
+                qualType: { type: string, enum: [nurse, caregiver, health_manager, other] }
+                certNo: { type: string, maxLength: 64 }
+                issuedAt: { type: string, format: date }
+                expiresAt: { type: string, format: date, nullable: true }
+      responses:
+        "200":
+          description: 登记成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortQualification" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escorts/{escortId}/qualifications/{qualificationId}/revoke:
+    put:
+      tags: [Escort]
+      summary: 停用陪诊师资质
+      description: 已停用的资质重复停用返回 422。
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/EscortId"
+        - $ref: "#/components/parameters/QualificationId"
+      responses:
+        "200":
+          description: 停用成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortQualification" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-schedules:
+    get:
+      tags: [Escort]
+      summary: 陪诊师排班分页
+      x-required-permission: crm:escort:read
+      parameters:
+        - in: query
+          name: escortId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/EscortSchedule" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Escort]
+      summary: 新增排班
+      description: 同一陪诊师同日班次时间段不得重叠；排班日期不得早于今天。
+      x-required-permission: crm:escort:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [escortId, workDate, startTime, endTime]
+              properties:
+                escortId: { type: string, format: uuid }
+                workDate: { type: string, format: date }
+                startTime: { type: string, format: "HH:mm" }
+                endTime: { type: string, format: "HH:mm" }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortSchedule" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-schedules/{scheduleId}:
+    put:
+      tags: [Escort]
+      summary: 修改排班
+      description: 重叠校验排除自身；排班日期不得早于今天。
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/ScheduleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workDate, startTime, endTime]
+              properties:
+                workDate: { type: string, format: date }
+                startTime: { type: string, format: "HH:mm" }
+                endTime: { type: string, format: "HH:mm" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortSchedule" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+    delete:
+      tags: [Escort]
+      summary: 删除排班
+      description: 仅可删除今天之后的排班。
+      x-required-permission: crm:escort:write
+      parameters:
+        - $ref: "#/components/parameters/ScheduleId"
+      responses:
+        "200":
+          description: 删除成功
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders:
+    get:
+      tags: [Escort]
+      summary: 陪诊订单分页查询
+      x-required-permission: crm:escortorder:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 订单号模糊匹配
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [PENDING, ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        - in: query
+          name: escortId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/EscortOrder" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Escort]
+      summary: 创建陪诊订单
+      description: 客户必须存在；服务日期不得早于今天；联系电话以密文+哈希+脱敏三列存储。
+      x-required-permission: crm:escortorder:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, serviceDate, startTime, endTime, area]
+              properties:
+                customerId: { type: string, format: uuid }
+                appointmentId: { type: string, format: uuid, nullable: true }
+                serviceDate: { type: string, format: date }
+                startTime: { type: string, format: "HH:mm" }
+                endTime: { type: string, format: "HH:mm" }
+                area: { type: string, maxLength: 100 }
+                contactPhone: { type: string, maxLength: 32 }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}:
+    get:
+      tags: [Escort]
+      summary: 陪诊订单详情
+      x-required-permission: crm:escortorder:read
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrderDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /escort-orders/{orderId}/dispatch:
+    put:
+      tags: [Escort]
+      summary: 派单
+      description: 依次校验订单为 PENDING、陪诊师启用、存在服务日内有效资质、排班完整覆盖服务时段、同日无时间窗冲突订单。
+      x-required-permission: crm:escortorder:write
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [escortId]
+              properties:
+                escortId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 派单成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/accept:
+    put:
+      tags: [Escort]
+      summary: 接单
+      x-required-permission: crm:escortorder:write
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      responses:
+        "200":
+          description: 接单成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/reject:
+    put:
+      tags: [Escort]
+      summary: 拒绝派单
+      description: 订单回退 PENDING 并保留拒绝原因与陪诊师关联。
+      x-required-permission: crm:escortorder:write
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/start:
+    put:
+      tags: [Escort]
+      summary: 开始服务
+      x-required-permission: crm:escortorder:manage
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/finish:
+    put:
+      tags: [Escort]
+      summary: 完成服务
+      description: 记录实际结束时间与时长（分钟，四舍五入），备注追加到订单。
+      x-required-permission: crm:escortorder:manage
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/cancel:
+    put:
+      tags: [Escort]
+      summary: 取消订单
+      description: 仅 PENDING/ASSIGNED/ACCEPTED 可取消；服务已开始需走完成。
+      x-required-permission: crm:escortorder:manage
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-orders/{orderId}/review:
+    post:
+      tags: [Escort]
+      summary: 提交陪诊评价
+      description: 仅已完成订单可评价，每单一条，重复评价返回 409。
+      x-required-permission: crm:escortorder:manage
+      parameters:
+        - $ref: "#/components/parameters/EscortOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 评价成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EscortReview" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /escort-reviews:
+    get:
+      tags: [Escort]
+      summary: 陪诊师评价分页
+      x-required-permission: crm:escort:read
+      parameters:
+        - in: query
+          name: escortId
+          required: false
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/EscortReview" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /home-services:
+    get:
+      tags: [HomeVisit]
+      summary: 上门服务目录分页查询
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 服务编号或名称模糊匹配
+        - in: query
+          name: category
+          required: false
+          schema: { type: string, enum: [medical, non_medical] }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [draft, pending_review, published, rejected, disabled] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/HomeService" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [HomeVisit]
+      summary: 创建上门服务
+      description: 服务编码全局唯一；medical 类目必须指定所需人员资质类型。
+      x-required-permission: crm:homevisit:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serviceCode, serviceName, category, durationMinutes, price]
+              properties:
+                serviceCode: { type: string, maxLength: 64 }
+                serviceName: { type: string, maxLength: 100 }
+                category: { type: string, enum: [medical, non_medical] }
+                requiredQualType: { type: string, enum: [nurse, caregiver, health_manager, doctor, other], nullable: true }
+                durationMinutes: { type: integer, minimum: 1 }
+                price: { type: number }
+                description: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeService" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-services/{serviceCode}:
+    put:
+      tags: [HomeVisit]
+      summary: 更新上门服务
+      description: 服务编码不可修改；medical 类目必须指定所需人员资质类型。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/ServiceCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serviceName, category, durationMinutes, price]
+              properties:
+                serviceName: { type: string, maxLength: 100 }
+                category: { type: string, enum: [medical, non_medical] }
+                requiredQualType: { type: string, enum: [nurse, caregiver, health_manager, doctor, other], nullable: true }
+                durationMinutes: { type: integer, minimum: 1 }
+                price: { type: number }
+                description: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeService" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-services/{serviceCode}/submit:
+    put:
+      tags: [HomeVisit]
+      summary: 提交上门服务审核
+      description: draft/rejected 状态提交后进入 pending_review。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/ServiceCode"
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeService" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-services/{serviceCode}/review:
+    put:
+      tags: [HomeVisit]
+      summary: 审核上门服务
+      description: 仅 pending_review 状态可审核；驳回时记录原因。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/ServiceCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 审核成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeService" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-services/{serviceCode}/status:
+    put:
+      tags: [HomeVisit]
+      summary: 上架/停用上门服务
+      description: 仅在 published 与 disabled 之间切换。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/ServiceCode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [published, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeService" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-addresses:
+    get:
+      tags: [HomeVisit]
+      summary: 客户上门地址列表
+      description: 返回指定客户的全部地址，不分页；手机号仅返回脱敏值。
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - in: query
+          name: customerId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/HomeAddress" }
+    post:
+      tags: [HomeVisit]
+      summary: 新增上门地址
+      description: 客户必须存在；手机号以密文+哈希+脱敏三列存储。
+      x-required-permission: crm:homevisit:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, address, contactName]
+              properties:
+                customerId: { type: string, format: uuid }
+                address: { type: string, maxLength: 200 }
+                contactName: { type: string, maxLength: 100 }
+                contactPhone: { type: string, maxLength: 32 }
+                isDefault: { type: boolean }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeAddress" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /home-addresses/{addressId}:
+    put:
+      tags: [HomeVisit]
+      summary: 更新上门地址
+      description: 仅更新提交的字段；customerId 不可修改。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address: { type: string, maxLength: 200 }
+                contactName: { type: string, maxLength: 100 }
+                contactPhone: { type: string, maxLength: 32 }
+                isDefault: { type: boolean }
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeAddress" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /home-addresses/{addressId}/status:
+    put:
+      tags: [HomeVisit]
+      summary: 启停上门地址
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/AddressId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeAddress" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /home-staff-qualifications:
+    get:
+      tags: [HomeVisit]
+      summary: 上门服务人员资质分页查询
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - in: query
+          name: userId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: qualType
+          required: false
+          schema: { type: string, enum: [nurse, caregiver, health_manager, doctor, other] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/HomeStaffQualification" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [HomeVisit]
+      summary: 登记上门服务人员资质
+      description: 同一人员同类型同证书编号唯一；签发日期不得晚于到期日期。
+      x-required-permission: crm:homevisit:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, qualType, certNo, issuedAt]
+              properties:
+                userId: { type: string, format: uuid }
+                qualType: { type: string, enum: [nurse, caregiver, health_manager, doctor, other] }
+                certNo: { type: string, maxLength: 64 }
+                issuedAt: { type: string, format: date }
+                expiresAt: { type: string, format: date, nullable: true }
+      responses:
+        "200":
+          description: 登记成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeStaffQualification" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-staff-qualifications/{staffQualificationId}/revoke:
+    put:
+      tags: [HomeVisit]
+      summary: 停用上门服务人员资质
+      description: 已停用的资质重复停用返回 422。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/StaffQualificationId"
+      responses:
+        "200":
+          description: 停用成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeStaffQualification" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders:
+    get:
+      tags: [HomeVisit]
+      summary: 上门服务订单分页查询
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 订单号模糊匹配
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [PENDING, APPROVED, REJECTED, ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        - in: query
+          name: serviceCode
+          required: false
+          schema: { type: string }
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: staffUserId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/HomeVisitOrder" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [HomeVisit]
+      summary: 创建上门服务订单
+      description: 服务必须已发布；地址必须属于该客户且启用；服务日期不得早于今天。
+      x-required-permission: crm:homevisit:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serviceCode, customerId, addressId, scheduledDate, startTime, endTime]
+              properties:
+                serviceCode: { type: string, maxLength: 64 }
+                customerId: { type: string, format: uuid }
+                addressId: { type: string, format: uuid }
+                scheduledDate: { type: string, format: date }
+                startTime: { type: string, format: "HH:mm" }
+                endTime: { type: string, format: "HH:mm" }
+                remark: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}:
+    get:
+      tags: [HomeVisit]
+      summary: 上门服务订单详情
+      description: 含地址快照、执行记录与异常列表。
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrderDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /home-visit-orders/{orderId}/review:
+    put:
+      tags: [HomeVisit]
+      summary: 审核上门服务订单
+      description: 仅 PENDING 可审核；approved=false 转 REJECTED 并记录原因。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 审核成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/dispatch:
+    put:
+      tags: [HomeVisit]
+      summary: 上门服务派单
+      description: 人员须存在有效资质且资质类型满足服务要求。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staffUserId]
+              properties:
+                staffUserId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 派单成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/accept:
+    put:
+      tags: [HomeVisit]
+      summary: 上门服务人员接单
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      responses:
+        "200":
+          description: 接单成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/reject:
+    put:
+      tags: [HomeVisit]
+      summary: 上门服务人员拒单
+      description: 订单回退待派单状态并保留拒绝原因。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/start:
+    put:
+      tags: [HomeVisit]
+      summary: 开始上门服务
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/executions:
+    post:
+      tags: [HomeVisit]
+      summary: 记录上门服务执行内容
+      description: 仅 IN_PROGRESS 状态可记录。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 1000 }
+                visitAt: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 记录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitExecution" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/exceptions:
+    post:
+      tags: [HomeVisit]
+      summary: 上报上门服务异常
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level, category, description]
+              properties:
+                level: { type: string, enum: [low, medium, high, critical] }
+                category: { type: string, enum: [vital_sign, equipment, patient_condition, staff_safety, other] }
+                description: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 上报成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitException" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/finish:
+    put:
+      tags: [HomeVisit]
+      summary: 完成上门服务
+      description: 记录实际结束时间与时长（分钟，四舍五入），备注追加到订单。
+      x-required-permission: crm:homevisit:write
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                remark: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-orders/{orderId}/cancel:
+    put:
+      tags: [HomeVisit]
+      summary: 取消上门服务订单
+      description: 服务已开始需走完成流程。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/HomeVisitOrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitOrder" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-exceptions:
+    get:
+      tags: [HomeVisit]
+      summary: 上门服务异常分页查询
+      x-required-permission: crm:homevisit:read
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [OPEN, ESCALATED, RESOLVED] }
+        - in: query
+          name: level
+          required: false
+          schema: { type: string, enum: [low, medium, high, critical] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/HomeVisitException" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /home-visit-exceptions/{exceptionId}/escalate:
+    put:
+      tags: [HomeVisit]
+      summary: 升级上门服务异常
+      description: 仅 OPEN 状态可升级。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/ExceptionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitException" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /home-visit-exceptions/{exceptionId}/resolve:
+    put:
+      tags: [HomeVisit]
+      summary: 处置完成上门服务异常
+      description: 已处置完成的异常重复处置返回 422。
+      x-required-permission: crm:homevisit:manage
+      parameters:
+        - $ref: "#/components/parameters/ExceptionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution]
+              properties:
+                resolution: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/HomeVisitException" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2376,6 +3754,51 @@ components:
     ReminderId:
       in: path
       name: reminderId
+      required: true
+      schema: { type: string, format: uuid }
+    EscortId:
+      in: path
+      name: escortId
+      required: true
+      schema: { type: string, format: uuid }
+    QualificationId:
+      in: path
+      name: qualificationId
+      required: true
+      schema: { type: string, format: uuid }
+    ScheduleId:
+      in: path
+      name: scheduleId
+      required: true
+      schema: { type: string, format: uuid }
+    EscortOrderId:
+      in: path
+      name: orderId
+      required: true
+      schema: { type: string, format: uuid }
+    ServiceCode:
+      in: path
+      name: serviceCode
+      required: true
+      schema: { type: string }
+    AddressId:
+      in: path
+      name: addressId
+      required: true
+      schema: { type: string, format: uuid }
+    StaffQualificationId:
+      in: path
+      name: staffQualificationId
+      required: true
+      schema: { type: string, format: uuid }
+    HomeVisitOrderId:
+      in: path
+      name: orderId
+      required: true
+      schema: { type: string, format: uuid }
+    ExceptionId:
+      in: path
+      name: exceptionId
       required: true
       schema: { type: string, format: uuid }
     Page:
@@ -3601,4 +5024,199 @@ components:
         reason: { type: string }
         recordedByName: { type: string }
         createdAt: { type: string, format: date-time }
+    Escort:
+      type: object
+      description: 陪诊师摘要，手机号仅返回脱敏值。
+      properties:
+        id: { type: string, format: uuid }
+        escortNo: { type: string }
+        name: { type: string }
+        gender: { type: string, enum: [unknown, male, female] }
+        phoneMasked: { type: string, nullable: true }
+        serviceAreas:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        avgRating: { type: number, nullable: true }
+        reviewCount: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EscortQualification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        qualType: { type: string, enum: [nurse, caregiver, health_manager, other] }
+        certNo: { type: string }
+        issuedAt: { type: string, format: date }
+        expiresAt: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [active, revoked] }
+        expired: { type: boolean }
+    EscortDetail:
+      type: object
+      properties:
+        summary: { $ref: "#/components/schemas/Escort" }
+        remark: { type: string, nullable: true }
+        qualifications:
+          type: array
+          items: { $ref: "#/components/schemas/EscortQualification" }
+    EscortSchedule:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        escortId: { type: string, format: uuid }
+        escortName: { type: string }
+        workDate: { type: string, format: date }
+        startTime: { type: string, format: "HH:mm" }
+        endTime: { type: string, format: "HH:mm" }
+    EscortOrder:
+      type: object
+      description: 陪诊订单摘要，状态机 PENDING→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED，取消为 CANCELLED。
+      properties:
+        id: { type: string, format: uuid }
+        orderNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string }
+        appointmentId: { type: string, format: uuid, nullable: true }
+        escortId: { type: string, format: uuid, nullable: true }
+        escortName: { type: string, nullable: true }
+        serviceDate: { type: string, format: date }
+        startTime: { type: string, format: "HH:mm" }
+        endTime: { type: string, format: "HH:mm" }
+        area: { type: string }
+        status: { type: string, enum: [PENDING, ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        actualStartAt: { type: string, format: date-time, nullable: true }
+        actualEndAt: { type: string, format: date-time, nullable: true }
+        durationMinutes: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EscortOrderDetail:
+      type: object
+      properties:
+        summary: { $ref: "#/components/schemas/EscortOrder" }
+        contactPhoneMasked: { type: string, nullable: true }
+        remark: { type: string, nullable: true }
+        rejectReason: { type: string, nullable: true }
+        cancelReason: { type: string, nullable: true }
+        assignedAt: { type: string, format: date-time, nullable: true }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        review: { $ref: "#/components/schemas/EscortReview", nullable: true }
+    EscortReview:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderNo: { type: string, nullable: true }
+        escortId: { type: string, format: uuid, nullable: true }
+        escortName: { type: string, nullable: true }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        content: { type: string, nullable: true }
+        createdBy: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    HomeService:
+      type: object
+      description: 上门服务目录项，价格以十进制字符串返回。
+      properties:
+        id: { type: string, format: uuid }
+        serviceCode: { type: string }
+        serviceName: { type: string }
+        category: { type: string, enum: [medical, non_medical] }
+        requiredQualType: { type: string, enum: [nurse, caregiver, health_manager, doctor, other], nullable: true }
+        durationMinutes: { type: integer }
+        price: { type: string, description: "十进制金额字符串" }
+        status: { type: string, enum: [draft, pending_review, published, rejected, disabled] }
+        description: { type: string, nullable: true }
+        reviewReason: { type: string, nullable: true }
+        reviewedBy: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+    HomeAddress:
+      type: object
+      description: 客户上门服务地址，手机号仅返回脱敏值。
+      properties:
+        id: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        address: { type: string }
+        contactName: { type: string }
+        contactPhoneMasked: { type: string, nullable: true }
+        isDefault: { type: boolean }
+        status: { type: string, enum: [active, disabled] }
+        remark: { type: string, nullable: true }
+    HomeStaffQualification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        username: { type: string }
+        displayName: { type: string }
+        qualType: { type: string, enum: [nurse, caregiver, health_manager, doctor, other] }
+        certNo: { type: string }
+        issuedAt: { type: string, format: date }
+        expiresAt: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [active, revoked] }
+        expired: { type: boolean }
+    HomeVisitOrder:
+      type: object
+      description: 上门服务订单摘要，状态机 PENDING→APPROVED→ASSIGNED→ACCEPTED→IN_PROGRESS→COMPLETED，驳回为 REJECTED、取消为 CANCELLED。
+      properties:
+        id: { type: string, format: uuid }
+        orderNo: { type: string }
+        serviceCode: { type: string }
+        serviceName: { type: string, nullable: true }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        addressId: { type: string, format: uuid }
+        scheduledDate: { type: string, format: date }
+        startTime: { type: string, format: "HH:mm" }
+        endTime: { type: string, format: "HH:mm" }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED, ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        staffUserId: { type: string, format: uuid, nullable: true }
+        staffName: { type: string, nullable: true }
+        actualStartAt: { type: string, format: date-time, nullable: true }
+        actualEndAt: { type: string, format: date-time, nullable: true }
+        durationMinutes: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    HomeVisitExecution:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        visitAt: { type: string, format: date-time }
+        content: { type: string }
+        recordedBy: { type: string }
+    HomeVisitException:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        orderNo: { type: string, nullable: true }
+        level: { type: string, enum: [low, medium, high, critical] }
+        category: { type: string, enum: [vital_sign, equipment, patient_condition, staff_safety, other] }
+        description: { type: string }
+        status: { type: string, enum: [OPEN, ESCALATED, RESOLVED] }
+        reportedBy: { type: string, nullable: true }
+        escalatedAt: { type: string, format: date-time, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+    HomeVisitOrderDetail:
+      type: object
+      properties:
+        summary: { $ref: "#/components/schemas/HomeVisitOrder" }
+        remark: { type: string, nullable: true }
+        reviewReason: { type: string, nullable: true }
+        cancelReason: { type: string, nullable: true }
+        assignedAt: { type: string, format: date-time, nullable: true }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+        address:
+          type: object
+          nullable: true
+          properties:
+            address: { type: string }
+            contactName: { type: string }
+            contactPhoneMasked: { type: string, nullable: true }
+        executions:
+          type: array
+          items: { $ref: "#/components/schemas/HomeVisitExecution" }
+        exceptions:
+          type: array
+          items: { $ref: "#/components/schemas/HomeVisitException" }
+        price: { type: string, description: "十进制金额字符串" }
+        serviceName: { type: string, nullable: true }
+        requiredQualType: { type: string, nullable: true }
 
