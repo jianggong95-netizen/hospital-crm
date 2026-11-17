@@ -95,9 +95,13 @@ class HomeAddressServiceTest {
                 CUSTOMER_ID, "上海市徐汇区YY路1号", "王五", null, true, null));
 
         assertThat(view.isDefault()).isTrue();
-        ArgumentCaptor<HomeAddress> captor = ArgumentCaptor.forClass(HomeAddress.class);
-        verify(addressRepository, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues().get(0).isDefault()).isFalse();
+        // 旧默认位经 saveAndFlush 先行清除，新默认地址经 save 落库
+        ArgumentCaptor<HomeAddress> flushCaptor = ArgumentCaptor.forClass(HomeAddress.class);
+        verify(addressRepository).saveAndFlush(flushCaptor.capture());
+        assertThat(flushCaptor.getValue().isDefault()).isFalse();
+        ArgumentCaptor<HomeAddress> saveCaptor = ArgumentCaptor.forClass(HomeAddress.class);
+        verify(addressRepository).save(saveCaptor.capture());
+        assertThat(saveCaptor.getValue().isDefault()).isTrue();
     }
 
     @Test
