@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务**、**CRM-011 订单、收费、支付与退款** 与 **CRM-012 会员、充值、次卡与套餐**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、会员等级与余额账本、积分与自动升级、次卡扣次与返还、套餐购买、共享授权与退款权益返还、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务**、**CRM-011 订单、收费、支付与退款**、**CRM-012 会员、充值、次卡与套餐** 与 **CRM-013 随访中心**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、会员等级与余额账本、积分与自动升级、次卡扣次与返还、套餐购买、共享授权与退款权益返还、随访分类模板计划、事件触发与重复事件去重、随访任务分配与记录、高风险自动人工队列、Docker 开发环境、数据库迁移与 CI。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -27,11 +27,12 @@
 - [上门服务（CRM-010）](#上门服务crm-010)
 - [订单、收费、支付与退款（CRM-011）](#订单收费支付与退款crm-011)
 - [会员、充值、次卡与套餐（CRM-012）](#会员充值次卡与套餐crm-012)
+- [随访中心（CRM-013）](#随访中心crm-013)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-012）](#本地验证记录crm-001--crm-012)
+- [本地验证记录（CRM-001 ~ CRM-013）](#本地验证记录crm-001--crm-013)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -66,10 +67,11 @@
 │  ├─ crm-homevisit/             # 上门服务（项目目录与审核、服务地址、人员资质、订单派单、执行记录、异常上报与升级）
 │  ├─ crm-order/                 # 订单与收银（统一订单、支付单、渠道回调、退款、对账、发票接口抽象）
 │  ├─ crm-member/                # 会员（等级、余额账本、积分、次卡、套餐、共享授权、退款权益返还）
+│  ├─ crm-followup/              # 随访中心（分类、模板、计划、事件触发、任务分配、随访记录、高风险人工队列）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、随访中心、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -372,6 +374,40 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 | 退款返还权益 | 充值退款按金额扣回余额；套餐退款作废次卡并返还剩余次数、按比例扣回积分 |
 | 数据库迁移 | `V12__member.sql` 新增等级/套餐/次卡/扣次/共享 5 张表、2 个业务号序列、3 项权限，并为账户与账本补充冻结金额、变动后快照与索引 |
 
+## 随访中心（CRM-013）
+
+`crm-followup` 模块承接随访分类、模板、计划、事件触发、任务分配、随访记录与高风险人工队列。计划按事件类型与偏移天数生成任务，**同一计划同一事件键只生成一次**（数据库部分唯一索引 `uq_followup_event` 兜底）；随访答案按模板风险规则评估，命中高风险规则自动进入人工队列（`ESCALATED`）。
+
+- **分类**：`GET/POST /api/v1/followup/categories`、`PUT /categories/{categoryCode}`；种子含出院、术后、慢病、服务满意度、高风险专病 5 类。
+- **模板**：`GET/POST /templates`、`PUT /templates/{templateCode}`、`PUT /templates/{templateCode}/status`；`questions` 为问题与选项，`riskRules` 定义 `highRisk` / `mediumRisk` 命中答案，模板每次修改版本号递增。
+- **计划**：`GET/POST /plans`、`PUT /plans/{planNo}`、`PUT /plans/{planNo}/status`；触发类型支持 `APPOINTMENT_COMPLETED` / `SERVICE_COMPLETED` / `ORDER_PAID` / `MANUAL`，偏移 0~365 天，可配置默认随访人与渠道；模板必须属于所选分类且分类与模板均启用。
+- **事件触发**：`POST /followup/triggers`，入参 `triggerType`、`eventKey`、`customerId`、`occurredAt`；按 `occurredAt + offsetDays` 计算计划时间，重复投递返回 `created=0`、`skipped=N`。
+- **任务**：`GET /followup/tasks`（支持状态、分类、风险、随访人、客户、是否升级与计划日期区间）、`POST /followup/tasks`、`GET /tasks/{taskId}`（含问卷与记录）；分配 `PUT /tasks/{taskId}/assign`、开始 `PUT /tasks/{taskId}/start`、取消 `PUT /tasks/{taskId}/cancel`。
+- **结果与风险**：`POST /tasks/{taskId}/records`；命中高风险规则任务转 `ESCALATED` 并记录 `escalatedAt` 与升级原因，中风险完成但标记 `MEDIUM`，低风险正常完成；一个任务只允许提交一次结果。
+- **人工队列**：`GET /followup/tasks?status=ESCALATED&escalationRequired=true`；手动升级 `PUT /tasks/{taskId}/escalate`、处置 `PUT /tasks/{taskId}/resolve`（可附处置说明，写入任务 `result_payload.resolution`）。
+- **审计**：`FOLLOWUP_CATEGORY_CREATE/UPDATE`、`FOLLOWUP_TEMPLATE_CREATE/UPDATE/STATUS`、`FOLLOWUP_PLAN_CREATE/UPDATE/STATUS`、`FOLLOWUP_TASK_CREATE`、`FOLLOWUP_TRIGGER`、`FOLLOWUP_TASK_ASSIGN`、`FOLLOWUP_TASK_START`、`FOLLOWUP_RECORD`、`FOLLOWUP_ESCALATE`、`FOLLOWUP_RESOLVE`、`FOLLOWUP_CANCEL` 均落库，仅记录任务号、分类、事件键与风险等级。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:followup:read` | 查看分类、模板、计划、任务、记录与人工队列 |
+| `crm:followup:write` | 创建任务、事件触发、分配随访人、开始随访与提交结果 |
+| `crm:followup:manage` | 维护分类/模板/计划、手动升级、处置人工队列与取消任务 |
+
+> 上线提示：V13 中上述 3 个权限默认仅授予 `SUPER_ADMIN`；随访人使用系统用户账号（V13 移除了基线 `crm_staff` 外键），分配前请确认对应账号已启用并有随访职责。
+
+### CRM-013 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 任务按规则生成 | `POST /followup/triggers` 按启用计划生成任务数等于匹配计划数，计划时间 = 事件时间 + 偏移天数 |
+| 重复事件不重复创建 | 同一 `eventKey` 再次触发返回 `created=0`、`skipped=N`，任务总数不变 |
+| 高风险回答进入人工队列 | 命中 `highRisk` 规则的答案使任务转 `ESCALATED`、`riskLevel=HIGH`、`escalationRequired=true`，可在人工队列查询并处置 |
+| 中低风险正常完成 | 命中 `mediumRisk` 标记 `MEDIUM` 并完成，未命中为 `LOW` 并完成，均不进入人工队列 |
+| 随访记录唯一 | 同一任务重复提交结果返回 409；已完成/已升级/已取消任务提交结果返回 422 |
+| 状态机 | 开始仅允许 `PENDING`；分配仅允许 `PENDING`；处置仅允许 `ESCALATED`；终态任务取消返回 422 |
+| 配置校验 | 重复分类编码 409；非法渠道 400；模板与分类不匹配 422；分类或模板停用时新建计划 422 |
+| 数据库迁移 | `V13__followup.sql` 新增分类/模板/计划/记录 4 张表，扩展任务表 8 个字段与 `uq_followup_event` 唯一索引，新增 5 分类、4 模板、4 计划种子与 3 项权限 |
+
 ## 健康检查与验收
 
 ```powershell
@@ -562,6 +598,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-010 新增 `crm_home_service`、`crm_home_address`、`crm_home_visit_order`、`crm_home_visit_execution`、`crm_home_visit_exception`、`crm_home_staff_qualification`、上门服务订单号序列、3 条已发布服务种子与 `crm:homevisit:*` 权限；默认地址使用部分唯一索引保证每客户唯一
 - CRM-011 在基线 `crm_order`、`crm_order_item`、`crm_payment`、`crm_refund` 之上新增 `crm_reconciliation_batch`、`crm_reconciliation_diff`、`crm_invoice`、订单/支付/退款/发票业务号序列与 `crm:order:*` / `crm:payment:*` 权限；支付单补充渠道交易号与幂等键唯一索引，退款单补充审核与渠道退款号
 - CRM-012 在基线 `crm_member_account`、`crm_member_ledger` 之上新增 `crm_member_level`、`crm_member_package`、`crm_member_card`、`crm_member_card_usage`、`crm_member_share`、账户号/卡号序列、5 条等级种子、3 条套餐种子与 `crm:member:*` 权限；账户补充冻结金额与更新时间，账本补充变动后余额/积分与业务号并建立客户唯一索引
+- CRM-013 在基线 `crm_followup_task` 之上新增 `crm_followup_category`、`crm_followup_template`、`crm_followup_plan`、`crm_followup_record`、任务号/计划号序列、5 条分类、4 条模板、4 条计划种子与 `crm:followup:*` 权限；任务表补充计划、模板、触发事件键、风险等级、分配/开始/升级时间与升级原因，并建立 `(plan_id, trigger_event_key)` 部分唯一索引防止重复建单
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -572,7 +609,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务、CRM-011 订单支付退款对账发票与 CRM-012 会员充值次卡套餐共享授权接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务、CRM-011 订单支付退款对账发票、CRM-012 会员充值次卡套餐共享授权与 CRM-013 随访分类模板计划任务人工队列接口）
 
 ## 已实现能力与明确未包含
 
@@ -580,7 +617,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 - Maven 多模块工程、统一响应与异常处理、traceId 透传
 - Actuator 健康检查、就绪/存活探针、Prometheus 指标端点
-- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务 + V11 订单支付退款对账 + V12 会员充值次卡套餐）
+- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务 + V11 订单支付退款对账 + V12 会员充值次卡套餐 + V13 随访中心）
 - JWT 无状态认证、刷新令牌轮换与复用检测、登录失败锁定
 - 用户、组织、角色、权限管理，RBAC + 五级数据范围（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）
 - 客户档案 CRUD、AES-256-GCM 敏感字段加密、HMAC 哈希检索、脱敏展示与敏感权限控制
@@ -598,26 +635,27 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 上门服务：项目目录审核链（草稿→待审→发布/驳回方可下单）、客户服务地址簿（默认位唯一）、人员资质库、派单与接单双重资质拦截、执行记录、异常上报/升级/处置闭环与未处置异常阻止完成
 - 订单与收银：服务端重算金额的统一订单、支付单与渠道回调（HMAC-SHA256 验签、重复回调幂等回放不重复入账）、多次部分退款与条件更新防超退、渠道对账批次与差异明细、发票申请/开具/红冲与可开票净额控制；`PaymentGateway` / `ChannelStatementProvider` / `InvoiceProvider` 均为可替换抽象，CRM 收费不写 HIS 收费表
 - 会员与权益：会员等级与折扣、储值余额与冻结金额、积分增减与按门槛自动升级、次卡购买/扣次/返还（条件更新防超扣）、套餐目录与三种套餐类型、家庭共享授权与代付、订单退款按规则返还权益；余额与积分每次变动写账本
-- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常、订单/支付/退款/对账/发票与会员开户/充值/消费/积分/套餐/次卡/共享/退款返还），支持按动作、资源、时间与数据范围查询
-- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、标签、用户/角色/组织/审计管理页面
+- 随访中心：随访分类/模板/计划配置、按事件与偏移天数生成任务、同一事件键去重、任务分配/开始/提交/取消、答案风险规则评估、高风险自动人工队列与处置
+- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常、订单/支付/退款/对账/发票、会员开户/充值/消费/积分/套餐/次卡/共享/退款返还与随访分类/模板/计划/任务/触发/分配/记录/升级/处置），支持按动作、资源、时间与数据范围查询
+- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、随访中心、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
 - Docker Compose 开发环境与 GitHub Actions CI
 
 明确未包含（按任务逐步交付）：
 
-- 随访、投诉、客服、商保等业务模块（CRM-013 及后续任务）
+- 投诉、客服、AI 数字人、呼叫中心、商保等业务模块（CRM-014 及后续任务）
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
-> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
+> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。CRM-012 的会员余额与积分变动全部写账本且条件更新防超扣，CRM-013 的随访风险规则在服务端评估、高风险任务只能由具备管理权限的角色处置。投诉等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-012）
+## 本地验证记录（CRM-001 ~ CRM-013）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
-| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（285 个测试执行，272 通过、13 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个、订单与收银测试 43 个、会员测试 32 个） |
+| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（312 个测试执行，299 通过、13 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个、订单与收银测试 43 个、会员测试 32 个、随访测试 27 个） |
 | 后端可执行包 | `mvnw.cmd -DskipTests package` | 生成 `crm-boot/target/crm-api.jar` |
-| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V12 + 启动 jar | 通过，启动日志从 `11` 增量迁移到 `12`，`flyway_schema_history` 最新版本为 `12:true`，健康检查返回 `UP` |
+| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V13 + 启动 jar | 通过，启动日志从 `12` 增量迁移到 `13`，`flyway_schema_history` 最新版本为 `13:true`，健康检查返回 `UP` |
 | CRM-007 V7 迁移内容 | 查询 `information_schema` / `crm_source_channel` / `sys_permission` | 8 张新表、3 个业务号序列、7 条渠道种子、10 项权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
 | 重复线索核验 | 相同手机号连续创建线索，再带 `forceCreate=true` 创建 | 首次 200；重复创建返回 409 `BUSINESS_CONFLICT` 并提示既有线索号；强制创建 200；`/leads/duplicates` 返回 2 条疑似线索 |
 | 线索转客户追溯 | 新建客户转化 + 关联既有客户转化 | `NEW_CUSTOMER` 与 `EXISTING_CUSTOMER` 均写入 `crm_lead_conversion`，`/leads/{id}/conversion` 返回线索 ID 与客户号；客户已存在时返回 422 并提示改为关联 |
@@ -682,13 +720,21 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 退款权益返还 | 次卡订单退款、充值订单退款 | 次卡订单退款作废 1 张卡并返还剩余 10 次；充值订单退款 20.00 扣回余额 20.00，次卡状态 `VOID` |
 | 会员权限与审计 | 查询 `sys_audit_log` 中 `MEMBER%` | 12 类动作（开户/充值/消费/积分/套餐/次卡/共享/退款返还）均已落库；审计中手机号明文 0 条 |
 | 会员与权益管理端构建 | `npm run build` | 通过，`MemberView`（账户/次卡/套餐/共享授权四标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
+| CRM-013 V13 迁移内容 | 查询 `flyway_schema_history` / `information_schema` / `crm_followup_category` / `crm_followup_plan` / `sys_permission` | 启动日志显示从 `12` 增量迁移到 `13`；分类/模板/计划/记录 4 张表、任务表 8 个扩展字段、任务号/计划号序列、5 条分类、4 条模板、4 条计划种子与 3 项 `crm:followup:*` 权限均已创建；`uq_followup_event` 唯一索引生效 |
+| 事件触发与去重 | `POST /followup/triggers`（`SERVICE_COMPLETED`）连续两次同一 `eventKey` | 首次 `created=2 skipped=0`；第二次 `created=0 skipped=2`；按客户查询任务数仍为 2，计划时间 = 事件时间 + 偏移天数 |
+| 高风险进入人工队列 | 提交答案 `condition=加重` | 任务转 `ESCALATED`、`riskLevel=HIGH`、`escalationRequired=true`，并出现在 `status=ESCALATED&escalationRequired=true` 查询结果中；处置后 `COMPLETED` |
+| 中低风险完成 | 提交 `medication=否`、`condition=良好` | 分别标记 `MEDIUM` 与 `LOW` 且状态 `COMPLETED`，均不进入人工队列 |
+| 随访记录与状态机 | 重复提交结果、重复处置、终态取消 | 重复提交 409「该随访任务已提交结果」；重复处置 422；已取消任务再次取消 422 |
+| 配置校验 | 重复分类编码、非法渠道、模板与分类不匹配、停用计划 | 分别返回 409、400、422、200（停用成功）；新建计划号 `FP100010+` |
+| 随访审计与去重校验 | 查询 `sys_audit_log` 中 `FOLLOWUP%` 与 `(plan_id, trigger_event_key)` 分组 | 10 类动作均已落库；同一计划同一事件键重复任务数 0；审计中手机号明文 0 条 |
+| 随访中心管理端构建 | `npm run build` | 通过，`FollowupView`（任务/人工队列/计划/模板/分类五标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
 | HIS 未配置 fail-closed | 未配置 `CRM_HIS_*` 调用 search/360/link | 返回 503 统一 JSON，不连接任何 HIS、不伪造数据 |
 | HIS 连接错误 | 启用 HIS 但配置不可达地址 | 返回 502 `UPSTREAM_ERROR`，同步日志记录失败与错误码 |
 | HIS 快照降级 | 预置未过期快照后调用 360 | 返回 200 且 `dataStatus=STALE`、`stale=true`，保留原始来源与获取时间；同步日志记录 `DEGRADED` |
 | HIS 人工核验 | `verified=false` 调用 link | 返回 422，不写入绑定关系 |
 | HIS 注入式输入 | 关键字传 `' or 1=1 --` | 作为普通参数处理，返回 0 条候选，无 SQL 异常 |
 | HIS 同步日志 | 查询 `/api/v1/his/sync-logs` | 分页返回检索/360/绑定记录与失败错误码，未配置 HIS 时仍可查询本地日志 |
-| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 154 个路径、144 个 schema，schema、parameter 与 response 引用全部可解析 |
+| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 170 个路径、164 个 schema，schema、parameter 与 response 引用全部可解析 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI

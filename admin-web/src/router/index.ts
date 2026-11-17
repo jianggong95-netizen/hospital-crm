@@ -70,6 +70,12 @@ const router = createRouter({
           meta: { title: '会员与权益', permission: 'crm:member:read' }
         },
         {
+          path: 'followup',
+          name: 'followup',
+          component: () => import('@/views/followup/FollowupView.vue'),
+          meta: { title: '随访中心', permission: 'crm:followup:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

@@ -386,9 +386,59 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void followupMigrationCreatesCategoryTemplatePlanAndRecordTables() {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables where table_schema = 'public' "
+                        + "and table_name in ('crm_followup_category','crm_followup_template',"
+                        + "'crm_followup_plan','crm_followup_record')",
+                Integer.class);
+        assertEquals(4, tableCount);
+
+        Integer taskColumns = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.columns "
+                        + "where table_schema = 'public' and table_name = 'crm_followup_task' "
+                        + "and column_name in ('plan_id','template_code','trigger_type','trigger_event_key',"
+                        + "'risk_level','assigned_at','escalated_at','escalation_reason')",
+                Integer.class);
+        assertEquals(8, taskColumns);
+
+        Integer eventIndex = jdbcTemplate.queryForObject(
+                "select count(*) from pg_indexes where schemaname = 'public' "
+                        + "and indexname = 'uq_followup_event'",
+                Integer.class);
+        assertEquals(1, eventIndex);
+
+        Integer categorySeeds = jdbcTemplate.queryForObject(
+                "select count(*) from crm_followup_category", Integer.class);
+        assertTrue(categorySeeds != null && categorySeeds >= 5);
+
+        Integer templateSeeds = jdbcTemplate.queryForObject(
+                "select count(*) from crm_followup_template", Integer.class);
+        assertTrue(templateSeeds != null && templateSeeds >= 4);
+
+        Integer planSeeds = jdbcTemplate.queryForObject(
+                "select count(*) from crm_followup_plan", Integer.class);
+        assertTrue(planSeeds != null && planSeeds >= 4);
+
+        Integer followupPermissions = jdbcTemplate.queryForObject(
+                "select count(*) from sys_permission where permission_code in "
+                        + "('crm:followup:read','crm:followup:write','crm:followup:manage')",
+                Integer.class);
+        assertEquals(3, followupPermissions);
+
+        Integer granted = jdbcTemplate.queryForObject(
+                "select count(*) from sys_role_permission rp "
+                        + "join sys_role r on r.id = rp.role_id "
+                        + "join sys_permission p on p.id = rp.permission_id "
+                        + "where r.role_code = 'SUPER_ADMIN' and p.permission_code like 'crm:followup:%'",
+                Integer.class);
+        assertEquals(3, granted);
+    }
+
+    @Test
     void appliedMigrationsIncludeSystemAuthScript() {
         Integer appliedMigrations = jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where success = true", Integer.class);
-        assertTrue(appliedMigrations != null && appliedMigrations >= 12);
+        assertTrue(appliedMigrations != null && appliedMigrations >= 13);
     }
 }

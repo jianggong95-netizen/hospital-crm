@@ -69,6 +69,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:member:read'
   },
   {
+    path: '/followup',
+    label: '随访中心',
+    short: '访',
+    tint: 'linear-gradient(135deg, #2f6fb5, #5c9cd6)',
+    permission: 'crm:followup:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

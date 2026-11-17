@@ -1608,24 +1608,508 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/Invoice" }
         "422": { $ref: "#/components/responses/BusinessRuleFailed" }
-  /followup/tasks:
+  /followup/categories:
+    get:
+      tags: [Followups]
+      summary: 查询随访分类
+      x-required-permission: crm:followup:read
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 分类列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/FollowupCategory" }
     post:
       tags: [Followups]
-      summary: 创建随访任务
+      summary: 新建随访分类
+      x-required-permission: crm:followup:manage
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [customerId, categoryCode, plannedAt, channel]
-              properties:
-                customerId: { type: string, format: uuid }
-                categoryCode: { type: string }
-                plannedAt: { type: string, format: date-time }
-                channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+            schema: { $ref: "#/components/schemas/FollowupCategoryCreate" }
       responses:
-        "201": { description: 创建成功 }
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupCategory" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /followup/categories/{categoryCode}:
+    put:
+      tags: [Followups]
+      summary: 修改随访分类
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: categoryCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupCategoryUpdate" }
+      responses:
+        "200":
+          description: 已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupCategory" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /followup/templates:
+    get:
+      tags: [Followups]
+      summary: 查询随访模板
+      x-required-permission: crm:followup:read
+      parameters:
+        - in: query
+          name: categoryCode
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 模板列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/FollowupTemplate" }
+    post:
+      tags: [Followups]
+      summary: 新建随访模板
+      x-required-permission: crm:followup:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupTemplateCreate" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTemplate" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/templates/{templateCode}:
+    put:
+      tags: [Followups]
+      summary: 修改随访模板，版本号递增
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: templateCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupTemplateUpdate" }
+      responses:
+        "200":
+          description: 已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTemplate" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /followup/templates/{templateCode}/status:
+    put:
+      tags: [Followups]
+      summary: 启用或停用随访模板
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: templateCode
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupStatusRequest" }
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTemplate" }
+  /followup/plans:
+    get:
+      tags: [Followups]
+      summary: 查询随访计划
+      x-required-permission: crm:followup:read
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: 计划列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/FollowupPlan" }
+    post:
+      tags: [Followups]
+      summary: 新建随访计划
+      x-required-permission: crm:followup:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupPlanCreate" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupPlan" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/plans/{planNo}:
+    put:
+      tags: [Followups]
+      summary: 修改随访计划
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: planNo
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupPlanUpdate" }
+      responses:
+        "200":
+          description: 已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupPlan" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /followup/plans/{planNo}/status:
+    put:
+      tags: [Followups]
+      summary: 启用或停用随访计划
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: planNo
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupStatusRequest" }
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupPlan" }
+  /followup/tasks:
+    get:
+      tags: [Followups]
+      summary: 分页查询随访任务（含人工队列）
+      x-required-permission: crm:followup:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [PENDING, IN_PROGRESS, COMPLETED, ESCALATED, CANCELLED] }
+        - in: query
+          name: categoryCode
+          schema: { type: string }
+        - in: query
+          name: riskLevel
+          schema: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        - in: query
+          name: assigneeId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: escalationRequired
+          schema: { type: boolean }
+        - in: query
+          name: dateFrom
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          schema: { type: string, format: date }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        "200":
+          description: 任务分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/FollowupTask" }
+    post:
+      tags: [Followups]
+      summary: 手工创建随访任务
+      x-required-permission: crm:followup:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupTaskCreate" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}:
+    get:
+      tags: [Followups]
+      summary: 查询随访任务详情（含问题与记录）
+      x-required-permission: crm:followup:read
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTaskDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /followup/tasks/{taskId}/assign:
+    put:
+      tags: [Followups]
+      summary: 分配随访人
+      x-required-permission: crm:followup:write
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupAssignRequest" }
+      responses:
+        "200":
+          description: 已分配
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}/start:
+    put:
+      tags: [Followups]
+      summary: 开始随访
+      x-required-permission: crm:followup:write
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 已开始
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}/records:
+    post:
+      tags: [Followups]
+      summary: 提交随访结果，高风险答案自动进入人工队列
+      x-required-permission: crm:followup:write
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupRecordCreate" }
+      responses:
+        "200":
+          description: 已提交
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTaskDetail" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}/escalate:
+    put:
+      tags: [Followups]
+      summary: 手动升级到人工队列
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupReasonRequest" }
+      responses:
+        "200":
+          description: 已升级
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}/resolve:
+    put:
+      tags: [Followups]
+      summary: 处置人工队列任务
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupResolveRequest" }
+      responses:
+        "200":
+          description: 已处置
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/tasks/{taskId}/cancel:
+    put:
+      tags: [Followups]
+      summary: 取消随访任务
+      x-required-permission: crm:followup:manage
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupReasonRequest" }
+      responses:
+        "200":
+          description: 已取消
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTask" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /followup/triggers:
+    post:
+      tags: [Followups]
+      summary: 事件触发随访任务，同一事件重复投递不重复创建
+      x-required-permission: crm:followup:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FollowupTriggerRequest" }
+      responses:
+        "200":
+          description: 触发结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FollowupTriggerResult" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
   /chat/sessions/{sessionId}/handoff:
     post:
       tags: [Chat]
@@ -5421,6 +5905,209 @@ components:
             orderNo: { type: string }
             status: { type: string }
         traceId: { type: string }
+    FollowupCategory:
+      type: object
+      properties:
+        categoryCode: { type: string }
+        categoryName: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, disabled] }
+        sortNo: { type: integer }
+    FollowupCategoryCreate:
+      type: object
+      required: [categoryCode, categoryName]
+      properties:
+        categoryCode: { type: string, pattern: "^[A-Za-z0-9_]{2,40}$" }
+        categoryName: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        sortNo: { type: integer, default: 0 }
+    FollowupCategoryUpdate:
+      type: object
+      required: [categoryName]
+      properties:
+        categoryName: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        sortNo: { type: integer }
+    FollowupTemplate:
+      type: object
+      description: 随访模板；questions 为问题清单，riskRules 定义高风险与中风险答案。
+      properties:
+        templateCode: { type: string }
+        categoryCode: { type: string }
+        templateName: { type: string }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        questions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        riskRules: { type: object, additionalProperties: true }
+        version: { type: integer }
+        status: { type: string, enum: [active, disabled] }
+        description: { type: string, nullable: true }
+    FollowupTemplateCreate:
+      type: object
+      required: [templateCode, categoryCode, templateName, channel]
+      properties:
+        templateCode: { type: string, pattern: "^[A-Za-z0-9_]{2,40}$" }
+        categoryCode: { type: string }
+        templateName: { type: string, maxLength: 120 }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        questions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        riskRules: { type: object, additionalProperties: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    FollowupTemplateUpdate:
+      type: object
+      required: [templateName, channel]
+      properties:
+        templateName: { type: string, maxLength: 120 }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        questions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        riskRules: { type: object, additionalProperties: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    FollowupPlan:
+      type: object
+      description: 随访计划；offsetDays 为事件发生后多少天创建任务。
+      properties:
+        planNo: { type: string }
+        planName: { type: string }
+        categoryCode: { type: string }
+        categoryName: { type: string, nullable: true }
+        templateCode: { type: string }
+        triggerType:
+          type: string
+          enum: [APPOINTMENT_COMPLETED, SERVICE_COMPLETED, ORDER_PAID, MANUAL]
+        offsetDays: { type: integer, minimum: 0, maximum: 365 }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        defaultAssigneeId: { type: string, format: uuid, nullable: true }
+        defaultAssigneeName: { type: string, nullable: true }
+        status: { type: string, enum: [active, disabled] }
+        description: { type: string, nullable: true }
+    FollowupPlanCreate:
+      type: object
+      required: [planName, categoryCode, templateCode, triggerType, offsetDays, channel]
+      properties:
+        planName: { type: string, maxLength: 120 }
+        categoryCode: { type: string }
+        templateCode: { type: string }
+        triggerType:
+          type: string
+          enum: [APPOINTMENT_COMPLETED, SERVICE_COMPLETED, ORDER_PAID, MANUAL]
+        offsetDays: { type: integer, minimum: 0, maximum: 365 }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        defaultAssigneeId: { type: string, format: uuid, nullable: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    FollowupPlanUpdate:
+      type: object
+      required: [planName, triggerType, offsetDays, channel]
+      properties:
+        planName: { type: string, maxLength: 120 }
+        triggerType:
+          type: string
+          enum: [APPOINTMENT_COMPLETED, SERVICE_COMPLETED, ORDER_PAID, MANUAL]
+        offsetDays: { type: integer, minimum: 0, maximum: 365 }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        defaultAssigneeId: { type: string, format: uuid, nullable: true }
+        description: { type: string, maxLength: 500, nullable: true }
+    FollowupStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, disabled] }
+    FollowupTask:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        taskNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        phoneMasked: { type: string, nullable: true }
+        categoryCode: { type: string }
+        categoryName: { type: string, nullable: true }
+        templateCode: { type: string, nullable: true }
+        channel: { type: string }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        assigneeName: { type: string, nullable: true }
+        plannedAt: { type: string, format: date-time }
+        status: { type: string, enum: [PENDING, IN_PROGRESS, COMPLETED, ESCALATED, CANCELLED] }
+        riskLevel: { type: string, enum: [LOW, MEDIUM, HIGH], nullable: true }
+        escalationRequired: { type: boolean }
+        resultCode: { type: string, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        planNo: { type: string, nullable: true }
+    FollowupRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        riskLevel: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        answers: { type: object, additionalProperties: { type: string } }
+        resultCode: { type: string, nullable: true }
+        remark: { type: string, nullable: true }
+        operatorId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+    FollowupTaskDetail:
+      type: object
+      properties:
+        task: { $ref: "#/components/schemas/FollowupTask" }
+        questions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        records:
+          type: array
+          items: { $ref: "#/components/schemas/FollowupRecord" }
+    FollowupTaskCreate:
+      type: object
+      required: [customerId, categoryCode, channel, plannedAt]
+      properties:
+        customerId: { type: string, format: uuid }
+        categoryCode: { type: string }
+        templateCode: { type: string, nullable: true }
+        channel: { type: string, enum: [phone, sms, mini_program, h5, ai, manual] }
+        plannedAt: { type: string, format: date-time }
+        assigneeId: { type: string, format: uuid, nullable: true }
+    FollowupTriggerRequest:
+      type: object
+      required: [triggerType, eventKey, customerId]
+      properties:
+        triggerType:
+          type: string
+          enum: [APPOINTMENT_COMPLETED, SERVICE_COMPLETED, ORDER_PAID, MANUAL]
+        eventKey: { type: string, maxLength: 120, description: "事件幂等键，同一计划同一事件只生成一次" }
+        customerId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time, nullable: true }
+    FollowupTriggerResult:
+      type: object
+      properties:
+        created: { type: integer }
+        skipped: { type: integer }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/FollowupTask" }
+    FollowupAssignRequest:
+      type: object
+      required: [assigneeId]
+      properties:
+        assigneeId: { type: string, format: uuid }
+    FollowupRecordCreate:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties: { type: string }
+        resultCode: { type: string, maxLength: 40, nullable: true }
+        remark: { type: string, maxLength: 1000, nullable: true }
+    FollowupReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, maxLength: 500 }
+    FollowupResolveRequest:
+      type: object
+      properties:
+        remark: { type: string, maxLength: 1000, nullable: true }
     MemberLevel:
       type: object
       description: 会员等级；discountRate 为应收折扣率，sortNo 越小等级越高。

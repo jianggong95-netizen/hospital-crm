@@ -51,7 +51,7 @@ export const phases: Phase[] = [
     focus: '随访、投诉表扬、消息触达',
     status: 'planned',
     tasks: [
-      'CRM-013 随访中心',
+      'CRM-013 随访中心（已完成）',
       'CRM-014 投诉表扬中心'
     ]
   },
