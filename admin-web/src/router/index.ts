@@ -58,6 +58,12 @@ const router = createRouter({
           meta: { title: '上门服务', permission: 'crm:homevisit:read' }
         },
         {
+          path: 'orders',
+          name: 'orders',
+          component: () => import('@/views/order/OrderView.vue'),
+          meta: { title: '收银与订单', permission: 'crm:order:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

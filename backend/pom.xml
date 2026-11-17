@@ -29,6 +29,7 @@
     <module>crm-appointment</module>
     <module>crm-escort</module>
     <module>crm-homevisit</module>
+    <module>crm-order</module>
     <module>crm-boot</module>
   </modules>
 

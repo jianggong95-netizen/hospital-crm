@@ -104,6 +104,8 @@ crm:
       display-name: ${CRM_BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
     data-encryption:
       key: ${CRM_DATA_ENCRYPTION_KEY:}
+  payment:
+    callback-secret: ${CRM_PAYMENT_CALLBACK_SECRET:crm_dev_callback_secret}
   patient360:
     cache-ttl-seconds: ${CRM_PATIENT360_CACHE_TTL_SECONDS:60}
     cache-max-entries: ${CRM_PATIENT360_CACHE_MAX_ENTRIES:500}

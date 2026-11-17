@@ -513,9 +513,54 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ServiceOrderResponse" }
   /orders:
+    get:
+      tags: [Orders]
+      summary: 订单分页查询
+      description: 金额一律由服务端按订单项重算，支持按订单号、状态、客户与创建日期过滤。
+      x-required-permission: crm:order:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+          description: 订单号模糊匹配
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [CREATED, PAID, COMPLETED, CANCELLED, PARTIAL_REFUNDED, REFUNDED] }
+        - in: query
+          name: customerId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dateFrom
+          required: false
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          required: false
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Order" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
     post:
       tags: [Orders]
       summary: 创建CRM收费订单
+      description: 服务端按 数量×单价 重算行金额与订单总额，优惠不得超过总额；幂等键重复返回 409。CRM 仅记录 CRM 主库资金流水，不写 HIS 收费表。
+      x-required-permission: crm:order:write
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -524,15 +569,89 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/OrderCreate" }
       responses:
-        "201":
+        "200":
           description: 订单创建成功
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/OrderResponse" }
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: 订单详情
+      x-required-permission: crm:order:read
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OrderDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /orders/{orderId}/cancel:
+    put:
+      tags: [Orders]
+      summary: 取消未支付订单
+      description: 仅 CREATED 且实付为 0 可取消；已支付订单须走退款流程（422）。
+      x-required-permission: crm:order:write
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReasonRequest" }
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /orders/{orderId}/complete:
+    put:
+      tags: [Orders]
+      summary: 完成已支付订单
+      x-required-permission: crm:order:write
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 完成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Order" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
   /orders/{orderId}/payments:
     post:
       tags: [Orders]
       summary: 发起支付
+      description: 支付金额必须大于 0 且不超过订单未付余额；幂等键重复返回 409。渠道由 PaymentGateway 抽象接入。
+      x-required-permission: crm:order:write
       parameters:
         - in: path
           name: orderId
@@ -545,16 +664,405 @@ paths:
           application/json:
             schema:
               type: object
-              required: [channel]
+              required: [channel, amount, idempotencyKey]
               properties:
-                channel: { type: string, enum: [wechat_pay, alipay, offline] }
-                returnUrl: { type: string, format: uri }
+                channel: { type: string, enum: [wechat, alipay, bank, cash, other] }
+                amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+                idempotencyKey: { type: string, maxLength: 100 }
       responses:
-        "201":
+        "200":
           description: 支付单创建成功
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/PaymentResponse" }
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Payment" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /payments:
+    get:
+      tags: [Orders]
+      summary: 支付单分页查询
+      x-required-permission: crm:order:read
+      parameters:
+        - in: query
+          name: keyword
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [PROCESSING, SUCCESS, FAILED, CLOSED] }
+        - in: query
+          name: channel
+          required: false
+          schema: { type: string, enum: [wechat, alipay, bank, cash, other] }
+        - in: query
+          name: orderId
+          required: false
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Payment" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /payments/{paymentId}:
+    get:
+      tags: [Orders]
+      summary: 支付状态
+      x-required-permission: crm:order:read
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Payment" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /payments/{paymentId}/refunds:
+    post:
+      tags: [Orders]
+      summary: 申请退款
+      description: 仅 SUCCESS 支付单可退款；金额不得超过 数量−累计已退（支持部分退款）。
+      x-required-permission: crm:order:write
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefundApply" }
+      responses:
+        "200":
+          description: 退款申请成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Refund" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /payment-callbacks/{channel}:
+    post:
+      tags: [Orders]
+      summary: 支付渠道回调
+      description: 免登录但强制 HMAC-SHA256 验签（失败 401）；同一支付单同一渠道交易号的重复回调按幂等回放，不重复入账。
+      security: []
+      parameters:
+        - in: path
+          name: channel
+          required: true
+          schema: { type: string, enum: [wechat, alipay, bank, cash, other] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaymentCallback" }
+      responses:
+        "200":
+          description: 回调处理结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PaymentCallbackResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /refunds:
+    get:
+      tags: [Orders]
+      summary: 退款单分页查询
+      x-required-permission: crm:payment:read
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [PENDING, APPROVED, REJECTED, SUCCESS, FAILED] }
+        - in: query
+          name: orderId
+          required: false
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Refund" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /refunds/{refundId}:
+    get:
+      tags: [Orders]
+      summary: 退款单详情
+      x-required-permission: crm:payment:read
+      parameters:
+        - in: path
+          name: refundId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Refund" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /refunds/{refundId}/approve:
+    put:
+      tags: [Orders]
+      summary: 审核通过并执行退款
+      description: 支付单与订单退款金额以条件更新原子累加，并发超退返回 422 并整体回滚。
+      x-required-permission: crm:payment:manage
+      parameters:
+        - in: path
+          name: refundId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 退款执行结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Refund" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /refunds/{refundId}/reject:
+    put:
+      tags: [Orders]
+      summary: 驳回购退款
+      x-required-permission: crm:payment:manage
+      parameters:
+        - in: path
+          name: refundId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReasonRequest" }
+      responses:
+        "200":
+          description: 驳回成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Refund" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /reconciliations:
+    get:
+      tags: [Orders]
+      summary: 对账批次分页查询
+      x-required-permission: crm:payment:read
+      parameters:
+        - in: query
+          name: channel
+          required: false
+          schema: { type: string }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [RUNNING, MATCHED, DIFF, FAILED] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ReconciliationBatch" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Orders]
+      summary: 执行渠道对账
+      description: 按渠道与账期比对本地成功支付与渠道账单（ChannelStatementProvider 抽象），生成批次与差异明细；全部一致为 MATCHED，否则 DIFF。
+      x-required-permission: crm:payment:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, reconcileDate]
+              properties:
+                channel: { type: string, enum: [wechat, alipay, bank, cash, other] }
+                reconcileDate: { type: string, format: date }
+      responses:
+        "200":
+          description: 对账完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ReconciliationDetail" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /reconciliations/{batchId}/diffs:
+    get:
+      tags: [Orders]
+      summary: 对账差异明细
+      x-required-permission: crm:payment:read
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ReconciliationDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /invoices:
+    get:
+      tags: [Orders]
+      summary: 发票分页查询
+      x-required-permission: crm:payment:read
+      parameters:
+        - in: query
+          name: orderId
+          required: false
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [APPLIED, ISSUED, VOID] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Invoice" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+  /invoices/orders/{orderId}:
+    post:
+      tags: [Orders]
+      summary: 申请开票
+      description: 可开票净额 = 实付 − 已退；同订单 APPLIED/ISSUED 累计不得超过净额。发票服务经 InvoiceProvider 抽象接入。
+      x-required-permission: crm:order:write
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceApply" }
+      responses:
+        "200":
+          description: 申请成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Invoice" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /invoices/{invoiceId}/issue:
+    put:
+      tags: [Orders]
+      summary: 开具发票
+      x-required-permission: crm:payment:manage
+      parameters:
+        - in: path
+          name: invoiceId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 开票成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Invoice" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /invoices/{invoiceId}/void:
+    put:
+      tags: [Orders]
+      summary: 红冲发票
+      x-required-permission: crm:payment:manage
+      parameters:
+        - in: path
+          name: invoiceId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReasonRequest" }
+      responses:
+        "200":
+          description: 红冲成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Invoice" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
   /followup/tasks:
     post:
       tags: [Followups]
@@ -4373,34 +4881,186 @@ components:
       required: [customerId, orderType, items]
       properties:
         customerId: { type: string, format: uuid }
-        orderType: { type: string }
+        orderType: { type: string, maxLength: 32, description: "escort/home_service/package/recharge/other" }
         items:
           type: array
           minItems: 1
-          items:
-            type: object
-            required: [itemCode, quantity, unitPrice]
-            properties:
-              itemCode: { type: string }
-              quantity: { type: number, exclusiveMinimum: 0 }
-              unitPrice: { type: string, pattern: "^[0-9]+(\\\\.[0-9]{1,2})?$" }
-    OrderResponse:
+          maxItems: 50
+          items: { $ref: "#/components/schemas/OrderItemCreate" }
+        discountAmount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$", nullable: true }
+        idempotencyKey: { type: string, maxLength: 100, nullable: true }
+        sourceChannel: { type: string, maxLength: 32, nullable: true }
+    OrderItemCreate:
+      type: object
+      required: [itemCode, itemName, quantity, unitPrice]
+      properties:
+        itemCode: { type: string, maxLength: 40 }
+        itemName: { type: string, maxLength: 120 }
+        quantity: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,3})?$", description: "数量必须大于 0" }
+        unitPrice: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+    Order:
+      type: object
+      description: 统一订单摘要；金额由服务端按订单项重算，状态机 CREATED→PAID→COMPLETED，未支付可 CANCELLED，退款后 PARTIAL_REFUNDED/REFUNDED。
+      properties:
+        id: { type: string, format: uuid }
+        orderNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        orderType: { type: string }
+        status: { type: string, enum: [CREATED, PAID, COMPLETED, CANCELLED, PARTIAL_REFUNDED, REFUNDED] }
+        currency: { type: string }
+        totalAmount: { type: string, description: "十进制金额字符串" }
+        discountAmount: { type: string }
+        payableAmount: { type: string }
+        paidAmount: { type: string }
+        refundedAmount: { type: string }
+        sourceChannel: { type: string, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrderItem:
       type: object
       properties:
-        code: { type: string }
-        data: { type: object, additionalProperties: true }
-        traceId: { type: string }
-    PaymentResponse:
+        id: { type: string, format: uuid }
+        itemCode: { type: string }
+        itemName: { type: string }
+        quantity: { type: string }
+        unitPrice: { type: string }
+        amount: { type: string }
+    OrderDetail:
       type: object
       properties:
-        code: { type: string }
-        data:
-          type: object
-          properties:
-            paymentNo: { type: string }
-            status: { type: string }
-            paymentUrl: { type: string, format: uri }
-        traceId: { type: string }
+        summary: { $ref: "#/components/schemas/Order" }
+        cancelReason: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderItem" }
+        payments:
+          type: array
+          items: { $ref: "#/components/schemas/Payment" }
+        refunds:
+          type: array
+          items: { $ref: "#/components/schemas/Refund" }
+    Payment:
+      type: object
+      description: 支付单；status PROCESSING/SUCCESS/FAILED/CLOSED，refundedAmount 为累计已退。
+      properties:
+        id: { type: string, format: uuid }
+        paymentNo: { type: string }
+        orderId: { type: string, format: uuid }
+        orderNo: { type: string, nullable: true }
+        channel: { type: string, enum: [wechat, alipay, bank, cash, other] }
+        channelTradeNo: { type: string, nullable: true }
+        amount: { type: string }
+        refundedAmount: { type: string }
+        status: { type: string, enum: [PROCESSING, SUCCESS, FAILED, CLOSED] }
+        paidAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    PaymentCallback:
+      type: object
+      required: [paymentNo, amount, success, signature]
+      properties:
+        paymentNo: { type: string }
+        channelTradeNo: { type: string, nullable: true }
+        amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+        success: { type: boolean }
+        signature:
+          type: string
+          description: 'HMAC-SHA256(hex)，规范化串 "paymentNo=&amount=&success=&tradeNo="'
+    PaymentCallbackResult:
+      type: object
+      properties:
+        paymentNo: { type: string }
+        status: { type: string, enum: [PROCESSING, SUCCESS, FAILED, CLOSED] }
+        replayed: { type: boolean, description: "true 表示重复回调按幂等回放，未重复入账" }
+    RefundApply:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+        reason: { type: string, maxLength: 1000 }
+    Refund:
+      type: object
+      description: 退款单；状态机 PENDING→APPROVED→SUCCESS，PENDING→REJECTED，执行失败为 FAILED。
+      properties:
+        id: { type: string, format: uuid }
+        refundNo: { type: string }
+        paymentId: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        amount: { type: string }
+        reason: { type: string }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED, SUCCESS, FAILED] }
+        channelRefundNo: { type: string, nullable: true }
+        reviewedBy: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+        rejectReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+    ReconciliationBatch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        batchNo: { type: string }
+        channel: { type: string }
+        reconcileDate: { type: string, format: date }
+        localCount: { type: integer }
+        channelCount: { type: integer }
+        localAmount: { type: string }
+        channelAmount: { type: string }
+        diffCount: { type: integer }
+        status: { type: string, enum: [RUNNING, MATCHED, DIFF, FAILED] }
+        runBy: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ReconciliationDiff:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        diffType: { type: string, enum: [LOCAL_ONLY, CHANNEL_ONLY, AMOUNT_MISMATCH] }
+        paymentNo: { type: string, nullable: true }
+        channelTradeNo: { type: string, nullable: true }
+        localAmount: { type: string, nullable: true }
+        channelAmount: { type: string, nullable: true }
+        handled: { type: boolean }
+    ReconciliationDetail:
+      type: object
+      properties:
+        batch: { $ref: "#/components/schemas/ReconciliationBatch" }
+        diffs:
+          type: array
+          items: { $ref: "#/components/schemas/ReconciliationDiff" }
+    InvoiceApply:
+      type: object
+      required: [title, amount]
+      properties:
+        title: { type: string, maxLength: 200 }
+        taxNo: { type: string, maxLength: 64, nullable: true }
+        amount: { type: string, pattern: "^[0-9]+(\\.[0-9]{1,2})?$" }
+        invoiceType: { type: string, enum: [general, special] }
+    Invoice:
+      type: object
+      description: 发票流水；可开票净额 = 实付 − 已退，红冲后置 VOID 释放额度。
+      properties:
+        id: { type: string, format: uuid }
+        invoiceNo: { type: string }
+        orderId: { type: string, format: uuid }
+        orderNo: { type: string, nullable: true }
+        customerId: { type: string, format: uuid }
+        title: { type: string }
+        taxNo: { type: string, nullable: true }
+        amount: { type: string }
+        invoiceType: { type: string, enum: [general, special] }
+        status: { type: string, enum: [APPLIED, ISSUED, VOID] }
+        provider: { type: string, nullable: true }
+        fileRef: { type: string, nullable: true }
+        appliedBy: { type: string, nullable: true }
+        appliedAt: { type: string, format: date-time }
+        issuedAt: { type: string, format: date-time, nullable: true }
+        voidReason: { type: string, nullable: true }
+    ReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, maxLength: 500 }
     LoginRequest:
       type: object
       required: [username, password]

@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务** 与 **CRM-010 上门服务**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务** 与 **CRM-011 订单、收费、支付与退款**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、Docker 开发环境、数据库迁移与 CI。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -25,11 +25,12 @@
 - [预约中心（CRM-008）](#预约中心crm-008)
 - [陪诊服务（CRM-009）](#陪诊服务crm-009)
 - [上门服务（CRM-010）](#上门服务crm-010)
+- [订单、收费、支付与退款（CRM-011）](#订单收费支付与退款crm-011)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-010）](#本地验证记录crm-001--crm-010)
+- [本地验证记录（CRM-001 ~ CRM-011）](#本地验证记录crm-001--crm-011)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -62,10 +63,11 @@
 │  ├─ crm-appointment/           # 预约中心（预约类型、服务时段、预约与改期取消、提醒重试、爽约记录）
 │  ├─ crm-escort/                # 陪诊服务（陪诊师档案与资质、排班防冲突、派单校验、履约计时、评价）
 │  ├─ crm-homevisit/             # 上门服务（项目目录与审核、服务地址、人员资质、订单派单、执行记录、异常上报与升级）
+│  ├─ crm-order/                 # 订单与收银（统一订单、支付单、渠道回调、退款、对账、发票接口抽象）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -295,6 +297,43 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 
 > 上线提示：V10 中上述 3 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；默认地址切换使用 `saveAndFlush` 保证旧行 UPDATE 先于新行 INSERT，避免与部分唯一索引冲突。
 
+## 订单、收费、支付与退款（CRM-011）
+
+`crm-order` 模块承接统一收银链路（订单、支付单、渠道回调、退款、对账、发票），金额一律由服务端重算，全部资金动作写入 `sys_audit_log`。**CRM 只在 CRM 主库记录资金流水，不写 HIS 收费表** —— 该模块不依赖 `crm-his`，不含任何 HIS 写操作。
+
+- **统一订单**：`GET/POST /api/v1/orders`、`GET /orders/{orderId}`、`PUT /orders/{orderId}/cancel`、`PUT /orders/{orderId}/complete`；`items` 行金额 = 数量 × 单价（按分四舍五入），订单总额 = 行金额合计，应付 = 总额 − 优惠，优惠超过总额返回 422；`Idempotency-Key` 重复返回 409；状态机 `CREATED→PAID→COMPLETED`，未支付可 `CANCELLED`，退款后为 `PARTIAL_REFUNDED`/`REFUNDED`。
+- **支付单**：`POST /orders/{orderId}/payments`、`GET /api/v1/payments`、`GET /payments/{paymentId}`；支付金额必须大于 0 且不超过「应付 − 实付」，超限返回 422；幂等键重复返回 409；渠道 `wechat/alipay/bank/cash/other` 经 `PaymentGateway` 抽象接入，默认 stub 返回占位交易号。
+- **渠道回调**：`POST /api/v1/payment-callbacks/{channel}`（免登录、强制验签）；验签为 HMAC-SHA256（规范化串 `paymentNo=&amount=&success=&tradeNo=`），缺失签名 400、签名错误 401；**同一支付单重复回调按幂等回放**（返回 `replayed=true`），`markSuccess` 条件更新只成功一次，`paid_amount` 不会重复累加。
+- **退款**：`POST /payments/{paymentId}/refunds`、`GET /api/v1/refunds`、`GET /refunds/{refundId}`、`PUT /refunds/{refundId}/approve`、`PUT /refunds/{refundId}/reject`；仅 `SUCCESS` 支付单可退，金额不超过「实付 − 累计已退」，支持多次部分退款；审核时支付单与订单退款额以条件更新原子累加，并发超退返回 422 并整体回滚；状态机 `PENDING→APPROVED→SUCCESS`，`PENDING→REJECTED`，执行失败为 `FAILED`。
+- **渠道对账**：`POST/GET /api/v1/reconciliations`、`GET /reconciliations/{batchId}/diffs`；按渠道与账期比对本地成功支付与渠道账单（`ChannelStatementProvider` 抽象），逐笔标记 `LOCAL_ONLY` / `CHANNEL_ONLY` / `AMOUNT_MISMATCH`，全部一致为 `MATCHED`，否则 `DIFF`。默认 stub 返回空账单，本地成功支付如实记为单边差异，不伪造渠道数据；对接微信/支付宝对账单文件时替换该实现即可。
+- **发票**：`POST /api/v1/invoices/orders/{orderId}`、`GET /invoices`、`PUT /invoices/{invoiceId}/issue`、`PUT /invoices/{invoiceId}/void`；可开票净额 = 实付 − 已退，同订单 `APPLIED`/`ISSUED` 累计不得超过净额；开票经 `InvoiceProvider` 抽象，默认 stub 返回占位文件引用；红冲置 `VOID` 释放额度。
+- **审计**：`ORDER_CREATE` / `ORDER_CANCEL` / `ORDER_COMPLETE` / `PAYMENT_INITIATE` / `PAYMENT_CALLBACK` / `REFUND_APPLY` / `REFUND_APPROVE` / `REFUND_REJECT` / `REFUND_SUCCESS` / `RECON_RUN` / `INVOICE_APPLY` / `INVOICE_ISSUE` / `INVOICE_VOID` 均落库，仅记录业务单号与金额，不含客户手机号。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:order:read` / `crm:order:write` | 查看订单与支付 / 创建订单、发起支付、申请退款、申请开票 |
+| `crm:payment:read` / `crm:payment:manage` | 查看退款与对账、发票 / 退款审核、执行对账、开票与红冲 |
+
+| 配置 | 说明 | 默认 |
+|---|---|---|
+| `crm.payment.callback-secret` | 支付回调 HMAC-SHA256 验签密钥（`CRM_PAYMENT_CALLBACK_SECRET`） | `crm_dev_callback_secret` |
+
+> 上线提示：V11 中上述 4 个权限默认仅授予 `SUPER_ADMIN`，其他角色需在角色管理中显式分配；生产环境必须替换 `CRM_PAYMENT_CALLBACK_SECRET` 为渠道分配的密钥，并将 `StubPaymentGateway`、`StubChannelStatementProvider`、`StubInvoiceProvider` 替换为真实渠道实现。
+
+### CRM-011 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 金额校验 | 订单总额由服务端按明细重算（`2×49.995 + 1×100.00 = 199.99`），应付 = 总额 − 优惠；优惠超总额 422；支付超未付余额 422；退款超可退余额 422；开票超净额 422 |
+| 重复回调不重复入账 | 首次回调 `replayed=false` 且实付 190.00；重复回调 `replayed=true`，`markSuccess` 条件更新返回 0 后直接回放，订单实付仍 190.00；并发重复回调不触发 `accumulatePaid` |
+| 部分退款正确 | 分两次退 50.00 + 140.00，支付单与订单 `refunded_amount` 累计 190.00，订单由 `PARTIAL_REFUNDED` 转 `REFUNDED`；第三笔超退 422 且整体回滚 |
+| 回调验签 | 缺失签名 400（参数校验）、错误签名 401，均不入账 |
+| 渠道对账 | 按渠道与账期生成批次，逐笔标记 `LOCAL_ONLY`/`CHANNEL_ONLY`/`AMOUNT_MISMATCH`；stub 空账单下本地 2 笔如实记为 2 笔差异，无伪造 |
+| 发票额度 | 申请 100 → 开具 → 红冲闭环；红冲后释放额度；全额退款后订单不可再开票（422） |
+| 不写 HIS 收费表 | `crm-order/pom.xml` 仅依赖 `crm-system`、`crm-customer`，无 `crm-his` 依赖与写库调用 |
+| 审计留痕 | 13 类资金动作写入 `sys_audit_log`，`detail` 中手机号明文匹配 0 条 |
+| 数据库迁移 | `V11__order_payment.sql` 新增对账批次/差异、发票表与 4 项权限，并为支付单补充渠道交易号与幂等键唯一索引 |
+
 ## 健康检查与验收
 
 ```powershell
@@ -483,6 +522,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-008 新增 `crm_appointment_type`、`crm_service_slot`、`crm_appointment`、`crm_appointment_reminder`、`crm_no_show_record`、预约号序列、5 条类型种子与 `crm:appttype:*` / `crm:appointment:*` 权限；时段容量含数据库级 `CHECK` 约束
 - CRM-009 新增 `crm_escort`、`crm_escort_qualification`、`crm_escort_schedule`、`crm_escort_order`、`crm_escort_review`、陪诊号与订单号序列及 `crm:escort:*` / `crm:escortorder:*` 权限；排班唯一索引与评价订单唯一索引兜底
 - CRM-010 新增 `crm_home_service`、`crm_home_address`、`crm_home_visit_order`、`crm_home_visit_execution`、`crm_home_visit_exception`、`crm_home_staff_qualification`、上门服务订单号序列、3 条已发布服务种子与 `crm:homevisit:*` 权限；默认地址使用部分唯一索引保证每客户唯一
+- CRM-011 在基线 `crm_order`、`crm_order_item`、`crm_payment`、`crm_refund` 之上新增 `crm_reconciliation_batch`、`crm_reconciliation_diff`、`crm_invoice`、订单/支付/退款/发票业务号序列与 `crm:order:*` / `crm:payment:*` 权限；支付单补充渠道交易号与幂等键唯一索引，退款单补充审核与渠道退款号
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -493,7 +533,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务与 CRM-010 上门服务接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务与 CRM-011 订单支付退款对账发票接口）
 
 ## 已实现能力与明确未包含
 
@@ -501,7 +541,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 - Maven 多模块工程、统一响应与异常处理、traceId 透传
 - Actuator 健康检查、就绪/存活探针、Prometheus 指标端点
-- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务）
+- Flyway 数据库迁移（V1 业务基线 + V2 认证与权限 + V3 客户中心 + V4 家庭账户 + V5 HIS 集成 + V6 患者 360 + V7 客户运营 + V8 预约中心 + V9 陪诊服务 + V10 上门服务 + V11 订单支付退款对账）
 - JWT 无状态认证、刷新令牌轮换与复用检测、登录失败锁定
 - 用户、组织、角色、权限管理，RBAC + 五级数据范围（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）
 - 客户档案 CRUD、AES-256-GCM 敏感字段加密、HMAC 哈希检索、脱敏展示与敏感权限控制
@@ -517,27 +557,27 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 预约中心：预约类型与服务时段管理、预约创建/改期/取消（截止规则）、条件更新原子占位并发防超卖、提醒定时派发与失败指数退避重试、人工重试、爽约记录与终态锁定
 - 陪诊服务：陪诊师档案与资质管理、排班重叠冲突阻止、订单派单五重校验（启用/资质/排班覆盖/时段冲突）、状态机流转与拒绝退回、履约起止计时、完成评价与评分聚合
 - 上门服务：项目目录审核链（草稿→待审→发布/驳回方可下单）、客户服务地址簿（默认位唯一）、人员资质库、派单与接单双重资质拦截、执行记录、异常上报/升级/处置闭环与未处置异常阻止完成
-- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单与上门服务目录/地址/订单/异常），支持按动作、资源、时间与数据范围查询
-- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、标签、用户/角色/组织/审计管理页面
+- 订单与收银：服务端重算金额的统一订单、支付单与渠道回调（HMAC-SHA256 验签、重复回调幂等回放不重复入账）、多次部分退款与条件更新防超退、渠道对账批次与差异明细、发票申请/开具/红冲与可开票净额控制；`PaymentGateway` / `ChannelStatementProvider` / `InvoiceProvider` 均为可替换抽象，CRM 收费不写 HIS 收费表
+- 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常与订单/支付/退款/对账/发票），支持按动作、资源、时间与数据范围查询
+- 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
 - Docker Compose 开发环境与 GitHub Actions CI
 
 明确未包含（按任务逐步交付）：
 
-- 订单支付、会员套餐、随访、投诉等业务模块（CRM-011 及后续任务）
-- 支付、退款、会员、随访、客服、商保等业务模块
+- 会员套餐、储值充值、随访、投诉等业务模块（CRM-012 及后续任务）
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
-> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截。订单、随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
+> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。随访等业务尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-010）
+## 本地验证记录（CRM-001 ~ CRM-011）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
-| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（207 个测试执行，196 通过、11 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个） |
+| 后端编译与单元/切片测试 | `mvnw.cmd test` | 通过（251 个测试执行，240 通过、11 个 CI 专用迁移测试按设计在本地跳过；其中患者 360 测试 7 个、客户运营测试 17 个、预约中心测试 22 个、陪诊服务测试 40 个、上门服务测试 50 个、订单与收银测试 43 个） |
 | 后端可执行包 | `mvnw.cmd -DskipTests package` | 生成 `crm-boot/target/crm-api.jar` |
-| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V10 + 启动 jar | 通过，`flyway_schema_history` 最新版本为 `10:true`，健康检查返回 `UP` |
+| PostgreSQL 16 真实迁移与启动 | 本地 PostgreSQL + Flyway V1~V11 + 启动 jar | 通过，启动日志从 `10` 增量迁移到 `11`，`flyway_schema_history` 最新版本为 `11:true`，健康检查返回 `UP` |
 | CRM-007 V7 迁移内容 | 查询 `information_schema` / `crm_source_channel` / `sys_permission` | 8 张新表、3 个业务号序列、7 条渠道种子、10 项权限均已创建；`SUPER_ADMIN` 自动授予全部 `crm:*` 权限 |
 | 重复线索核验 | 相同手机号连续创建线索，再带 `forceCreate=true` 创建 | 首次 200；重复创建返回 409 `BUSINESS_CONFLICT` 并提示既有线索号；强制创建 200；`/leads/duplicates` 返回 2 条疑似线索 |
 | 线索转客户追溯 | 新建客户转化 + 关联既有客户转化 | `NEW_CUSTOMER` 与 `EXISTING_CUSTOMER` 均写入 `crm_lead_conversion`，`/leads/{id}/conversion` 返回线索 ID 与客户号；客户已存在时返回 422 并提示改为关联 |
@@ -585,13 +625,20 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 预约中心管理端构建 | `npm run build` | 通过，`AppointmentView`（预约/时段/类型/爽约四标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
 | 陪诊服务管理端构建 | `npm run build` | 通过，`EscortView`（订单/陪诊师/排班/评价四标签页）路由与页面正常打包，详情嵌套结构在 api 层拍平适配，`vue-tsc` 类型检查无错误 |
 | 上门服务管理端构建 | `npm run build` | 通过，`HomeVisitView`（订单/目录/地址/资质/异常五标签页）路由与页面正常打包，详情嵌套结构在 api 层拍平适配，`vue-tsc` 类型检查无错误 |
+| CRM-011 V11 迁移内容 | 查询 `flyway_schema_history` / `crm_reconciliation_batch` / `crm_invoice` | 启动日志显示从 `10` 增量迁移到 `11`；对账批次/差异、发票表、4 项权限与支付单唯一索引均已创建 |
+| 订单金额与幂等 | 创建订单（2×49.995 + 1×100.00，优惠 9.99）、重复提交同一幂等键、优惠超总额 | 总额 199.99、应付 190.00；重复幂等键 409；优惠 100.01 超总额 422 |
+| 重复回调不重复入账 | 同一支付单连续回调两次（HMAC-SHA256 签名） | 首次 `replayed=false` 且实付 190.00；第二次 `replayed=true`，实付仍 190.00；缺签名 400、错误签名 401 |
+| 部分退款正确 | 分两笔退 50.00 与 140.00，并尝试超退 200.00 | 累计已退 190.00，订单由 `PARTIAL_REFUNDED` 转 `REFUNDED`；超退 422 且整体回滚 |
+| 发票与渠道对账 | 申请 100 → 开具 → 红冲；执行渠道对账并查差异明细 | 状态 `APPLIED`→`ISSUED`→`VOID`；全额退款后开票 422；对账批次 `DIFF` 并逐笔标记 `LOCAL_ONLY`，stub 不伪造渠道数据 |
+| 收银不写 HIS 收费表 | 检查 `crm-order/pom.xml` 依赖与调用 | 仅依赖 `crm-system`、`crm-customer`，无 `crm-his` 依赖，不含任何 HIS 写操作 |
+| 收银与订单管理端构建 | `npm run build` | 通过，`OrderView`（订单/支付/退款/对账/发票五标签页）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
 | HIS 未配置 fail-closed | 未配置 `CRM_HIS_*` 调用 search/360/link | 返回 503 统一 JSON，不连接任何 HIS、不伪造数据 |
 | HIS 连接错误 | 启用 HIS 但配置不可达地址 | 返回 502 `UPSTREAM_ERROR`，同步日志记录失败与错误码 |
 | HIS 快照降级 | 预置未过期快照后调用 360 | 返回 200 且 `dataStatus=STALE`、`stale=true`，保留原始来源与获取时间；同步日志记录 `DEGRADED` |
 | HIS 人工核验 | `verified=false` 调用 link | 返回 422，不写入绑定关系 |
 | HIS 注入式输入 | 关键字传 `' or 1=1 --` | 作为普通参数处理，返回 0 条候选，无 SQL 异常 |
 | HIS 同步日志 | 查询 `/api/v1/his/sync-logs` | 分页返回检索/360/绑定记录与失败错误码，未配置 HIS 时仍可查询本地日志 |
-| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 119 个路径、117 个 schema，schema 与 parameter 引用全部可解析 |
+| OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 136 个路径、130 个 schema，schema、parameter 与 response 引用全部可解析 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI
