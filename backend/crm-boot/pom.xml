@@ -102,6 +102,24 @@
     </dependency>
 
     <dependency>
+      <groupId>com.hospital.crm</groupId>
+      <artifactId>crm-callcenter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.hospital.crm</groupId>
+      <artifactId>crm-insurance</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.hospital.crm</groupId>
+      <artifactId>crm-analytics</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>

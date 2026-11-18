@@ -110,6 +110,11 @@ crm:
       key: ${CRM_DATA_ENCRYPTION_KEY:}
   payment:
     callback-secret: ${CRM_PAYMENT_CALLBACK_SECRET:crm_dev_callback_secret}
+  callcenter:
+    enabled: ${CRM_CALLCENTER_ENABLED:false}
+    provider: ${CRM_CALLCENTER_PROVIDER:}
+  sms:
+    provider: ${CRM_SMS_PROVIDER:simulated}
   patient360:
     cache-ttl-seconds: ${CRM_PATIENT360_CACHE_TTL_SECONDS:60}
     cache-max-entries: ${CRM_PATIENT360_CACHE_MAX_ENTRIES:500}

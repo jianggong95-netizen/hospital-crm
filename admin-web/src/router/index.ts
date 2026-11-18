@@ -94,6 +94,24 @@ const router = createRouter({
           meta: { title: 'AI 知识库', permission: 'crm:knowledge:read' }
         },
         {
+          path: 'callcenter',
+          name: 'callcenter',
+          component: () => import('@/views/callcenter/CallCenterView.vue'),
+          meta: { title: '呼叫中心', permission: 'crm:call:read' }
+        },
+        {
+          path: 'insurance',
+          name: 'insurance',
+          component: () => import('@/views/insurance/InsuranceView.vue'),
+          meta: { title: '商保中心', permission: 'crm:insurance:read' }
+        },
+        {
+          path: 'analytics',
+          name: 'analytics',
+          component: () => import('@/views/analytics/AnalyticsView.vue'),
+          meta: { title: '运营分析', permission: 'crm:analytics:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

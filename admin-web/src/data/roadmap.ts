@@ -63,7 +63,7 @@ export const phases: Phase[] = [
     tasks: [
       'CRM-015 在线客服与人工工作台（已完成）',
       'CRM-016 AI 知识库与数字人（已完成）',
-      'CRM-017 呼叫中心与短信'
+      'CRM-017 呼叫中心与短信（已完成）'
     ]
   },
   {
@@ -72,8 +72,8 @@ export const phases: Phase[] = [
     focus: '商保中心、运营分析',
     status: 'planned',
     tasks: [
-      'CRM-018 商保中心',
-      'CRM-019 运营分析'
+      'CRM-018 商保中心（已完成）',
+      'CRM-019 运营分析（已完成）'
     ]
   },
   {

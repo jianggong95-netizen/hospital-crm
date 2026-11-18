@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -123,6 +124,19 @@ public class CustomerService {
         }
         return customerRepository.findAllById(customerIds).stream()
                 .collect(java.util.stream.Collectors.toMap(Customer::getId, this::toBrief));
+    }
+
+    /**
+     * 按手机号匹配启用中的客户（来电弹屏等场景）；号码规范化后走检索哈希，不接触明文存储。
+     */
+    @Transactional(readOnly = true)
+    public Optional<CustomerDtos.CustomerBrief> matchByPhone(String phone) {
+        String normalized = CustomerMasking.normalizePhone(phone);
+        if (normalized == null) {
+            return Optional.empty();
+        }
+        return customerRepository.findFirstByPhoneHashAndStatus(hasher.hash(normalized), "active")
+                .map(this::toBrief);
     }
 
     @Transactional

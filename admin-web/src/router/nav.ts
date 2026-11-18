@@ -97,6 +97,27 @@ export const navItems: NavItem[] = [
     permission: 'crm:knowledge:read'
   },
   {
+    path: '/callcenter',
+    label: '呼叫中心',
+    short: '呼',
+    tint: 'linear-gradient(135deg, #b5652f, #d69a5c)',
+    permission: 'crm:call:read'
+  },
+  {
+    path: '/insurance',
+    label: '商保中心',
+    short: '保',
+    tint: 'linear-gradient(135deg, #2d6d5a, #5aa88d)',
+    permission: 'crm:insurance:read'
+  },
+  {
+    path: '/analytics',
+    label: '运营分析',
+    short: '析',
+    tint: 'linear-gradient(135deg, #2d6dad, #4c8fd8)',
+    permission: 'crm:analytics:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',

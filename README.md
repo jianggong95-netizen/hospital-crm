@@ -9,7 +9,7 @@
 
 医院智慧客户服务与运营管理平台，面向医院内网私有化部署，覆盖客户中心、患者 360、家庭账户、预约、陪诊、上门服务、随访、客服、AI 数字人、呼叫中心、商保、投诉、会员、订单支付与运营分析。
 
-当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务**、**CRM-011 订单、收费、支付与退款**、**CRM-012 会员、充值、次卡与套餐**、**CRM-013 随访中心**、**CRM-014 投诉表扬中心**、**CRM-015 在线客服与人工工作台** 与 **CRM-016 AI 知识库与数字人**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、会员等级与余额账本、积分与自动升级、次卡扣次与返还、套餐购买、共享授权与退款权益返还、随访分类模板计划、事件触发与重复事件去重、随访任务分配与记录、高风险自动人工队列、投诉表扬建单与 SLA、分派与处理动作留痕、整改与患者反馈、结案复核分权、超时自动升级、客服会话与消息、首次确认二次排队与直接转人工、人工队列与条件接管、客服转接与会话级权限隔离、AI 交接摘要、知识文档上传解析与切片、送审敏感扫描、审核发布与版本快照、失效知识下架、RAG 检索问答与引用来源追溯、低置信度转人工联动与 AI 随访话术草稿、Docker 开发环境、数据库迁移与 CI。
+当前完成 **CRM-001 项目初始化**、**CRM-002 认证与权限**、**CRM-003 客户中心**、**CRM-004 家庭账户**、**CRM-005 HIS 集成**、**CRM-006 患者 360**、**CRM-007 客户运营、邀约与分诊**、**CRM-008 预约中心**、**CRM-009 陪诊服务**、**CRM-010 上门服务**、**CRM-011 订单、收费、支付与退款**、**CRM-012 会员、充值、次卡与套餐**、**CRM-013 随访中心**、**CRM-014 投诉表扬中心**、**CRM-015 在线客服与人工工作台**、**CRM-016 AI 知识库与数字人**、**CRM-017 呼叫中心与短信**、**CRM-018 商保中心** 与 **CRM-019 运营分析**：可运行的后端、管理端、移动端骨架，JWT 认证、RBAC 与数据范围、审计日志、客户档案加密与脱敏、标签管理、家庭账户与代办授权、HIS 只读适配与患者查询、CRM/HIS 聚合的患者 360 视图、线索与来源渠道、邀约任务、活动参与、线索转客户追溯、预约类型与服务时段、预约与改期取消（并发防超卖）、提醒失败重试与爽约记录、陪诊师排班防冲突与派单五重校验、履约计时与评价、上门服务目录审核与资质双重拦截及异常升级处置、统一订单与支付回调幂等入账、部分退款、渠道对账与发票接口抽象、会员等级与余额账本、积分与自动升级、次卡扣次与返还、套餐购买、共享授权与退款权益返还、随访分类模板计划、事件触发与重复事件去重、随访任务分配与记录、高风险自动人工队列、投诉表扬建单与 SLA、分派与处理动作留痕、整改与患者反馈、结案复核分权、超时自动升级、客服会话与消息、首次确认二次排队与直接转人工、人工队列与条件接管、客服转接与会话级权限隔离、AI 交接摘要、知识文档上传解析与切片、送审敏感扫描、审核发布与版本快照、失效知识下架、RAG 检索问答与引用来源追溯、低置信度转人工联动与 AI 随访话术草稿、Docker 开发环境、数据库迁移与 CI。CRM-019 运营分析提供指标口径定义、运营看板、报表查询、导出审批与组织数据权限能力。
 
 > 规划与契约文档位于 `Hospital_CRM_V1_0_交付包/`，本仓库代码按其中的总体方案、数据库设计与 API 规范实施。
 
@@ -31,11 +31,14 @@
 - [投诉表扬中心（CRM-014）](#投诉表扬中心crm-014)
 - [在线客服与人工工作台（CRM-015）](#在线客服与人工工作台crm-015)
 - [AI 知识库与数字人（CRM-016）](#ai-知识库与数字人crm-016)
+- [呼叫中心与短信（CRM-017）](#呼叫中心与短信crm-017)
+- [商保中心（CRM-018）](#商保中心crm-018)
+- [运营分析（CRM-019）](#运营分析crm-019)
 - [健康检查与验收](#健康检查与验收)
 - [数据库与迁移](#数据库与迁移)
 - [API 约定](#api-约定)
 - [已实现能力与明确未包含](#已实现能力与明确未包含)
-- [本地验证记录（CRM-001 ~ CRM-016）](#本地验证记录crm-001--crm-016)
+- [本地验证记录（CRM-001 ~ CRM-019）](#本地验证记录crm-001--crm-019)
 - [CI](#ci)
 - [模块扩展约定](#模块扩展约定)
 - [生产部署与安全要点](#生产部署与安全要点)
@@ -71,10 +74,11 @@
 │  ├─ crm-order/                 # 订单与收银（统一订单、支付单、渠道回调、退款、对账、发票接口抽象）
 │  ├─ crm-member/                # 会员（等级、余额账本、积分、次卡、套餐、共享授权、退款权益返还）
 │  ├─ crm-followup/              # 随访中心（分类、模板、计划、事件触发、任务分配、随访记录、高风险人工队列）
+│  ├─ crm-analytics/             # 运营分析（指标口径定义、运营看板、报表定义与取数、导出审批闭环、组织数据权限）
 │  ├─ crm-boot/                  # Spring Boot 启动、Web 配置、Flyway 迁移
 │  ├─ Dockerfile
 │  └─ pom.xml
-├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、随访中心、标签、系统管理）
+├─ admin-web/                    # Vue 3 管理端（登录、工作台、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、随访中心、运营分析、标签、系统管理）
 ├─ patient-mobile/               # uni-app 患者与员工移动端（H5 / 微信小程序）
 ├─ .github/workflows/ci.yml      # 后端测试、前端构建、Compose 校验
 ├─ docker-compose.yml            # PostgreSQL / Redis / RabbitMQ / MinIO / 应用
@@ -522,6 +526,130 @@ HIS 适配器默认关闭；未配置时 `/api/v1/his/patients/**` 患者查询 
 | 仅已发布可检索 | 草稿/待审/驳回/下架文档的切片均不出现在检索结果中 |
 | 数据库迁移 | `V16__knowledge.sql` 新增分类、文档、切片、版本、审核、问答日志 6 张表、知识编号序列与 3 项 `crm:knowledge:*` 权限 |
 
+## 呼叫中心与短信（CRM-017）
+
+`backend/crm-callcenter` 模块承接呼叫中心适配、来电弹屏、通话记录、录音索引与访问授权、短信模板与消息发送 Outbox。呼叫中心厂商未定，通过适配器抽象接入：默认未接入，相关接口返回 502，**禁止伪造录音地址与通话数据**。
+
+- **呼叫中心适配器**：`crm.callcenter.enabled` / `crm.callcenter.provider`（环境变量 `CRM_CALLCENTER_ENABLED`、`CRM_CALLCENTER_PROVIDER`）控制接入与厂商实现；上线前需医院确认呼叫中心厂商 API 与录音存储后接入。
+- **来电弹屏**：`GET /api/v1/callcenter/incoming-popup?phone=`；按手机号 HMAC-SHA-256 哈希匹配 CRM 客户，仅返回脱敏客户信息与通话历史次数、最近通话时间，不返回明文号码。
+- **通话记录**：`GET/POST /callcenter/calls`、`GET /callcenter/calls/{id}`；厂商话单同步以 `vendorCallId` 幂等，重复提交返回既有记录；人工补录来源 `source=manual`；支持按方向、状态、客户、关联类型与日期区间筛选。
+- **通话关联**：`POST /callcenter/calls/{id}/link` 可关联客户、投诉工单、客服会话或预约；目标对象不存在返回 404，不创建悬空关联。
+- **录音索引与访问授权**：`GET /callcenter/calls/{id}/recording`；录音仅存索引（key/存储类型/时长/大小），访问地址由该接口即时签发，需独立权限 `crm:call:recording:read`，每次访问写入审计 `CALL_RECORDING_ACCESS`；该通话无录音返回 422，呼叫中心未接入返回 502。
+- **短信模板**：`GET/POST /callcenter/sms/templates`、`GET/PUT /callcenter/sms/templates/{id}`、`POST /callcenter/sms/templates/{id}/status`；`content` 中 `{{变量}}` 占位符自动提取为变量清单，编码重复返回 409，支持启用/停用。
+- **消息 Outbox**：`POST /callcenter/messages` 先落 `crm_message_outbox` 再由派发器发送；`bizKey` 去重幂等（重复提交返回既有消息，不重复发送）；模板与 `content` 二选一否则 400，模板不存在 404，模板停用或变量缺失 422；每 60 秒定时派发（`POST /callcenter/messages/dispatch` 为同一入口，返回 `scanned/sent/failed/at`）；失败按 300s×2^(n-1) 指数退避最多自动重试 3 次，超限后仅可人工重试（`POST /callcenter/messages/{id}/retry`，仅 `PENDING/FAILED` 可重试，其余 422）；派发与重试均用条件更新防止并发重发。
+- **短信服务商**：`crm.sms.provider`（环境变量 `CRM_SMS_PROVIDER`，默认 `simulated`）；接入服务商协议后替换实现，接口契约不变。
+- **敏感数据**：主叫/被叫/接收号码仅返回脱敏值（前3后4），后端以 HMAC-SHA-256 哈希检索存储，明文不入库、不进审计。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:call:read` | 查看来电弹屏、通话记录列表与详情 |
+| `crm:call:write` | 同步/补录通话记录、关联通话与业务对象 |
+| `crm:call:recording:read` | 获取录音访问授权（独立授权、访问留审计） |
+| `crm:sms:read` | 查看短信模板与消息发送记录 |
+| `crm:sms:template:manage` | 新建、修改、启停用短信模板 |
+| `crm:sms:send` | 发送消息、人工重试与触发 Outbox 派发 |
+
+> 上线提示：V17 中 6 项权限默认仅授予 `SUPER_ADMIN`，建议录音访问授权 `crm:call:recording:read` 单独授予质检/主管岗，保证每次录音收听可审计。呼叫中心厂商未定：上线前必须由医院确认呼叫中心厂商 API 与录音存储方式，配置 `CRM_CALLCENTER_ENABLED=true` 与 `CRM_CALLCENTER_PROVIDER` 后接入，未接入期间通话记录仍可人工补录、录音授权接口固定返回 502。短信渠道默认 `CRM_SMS_PROVIDER=simulated`（模拟发送、状态可查），上线前替换为医院确认的服务商实现。
+
+### CRM-017 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 呼叫中心未接入返回 502 | `CRM_CALLCENTER_ENABLED=false` 时录音授权接口返回 502，不伪造录音地址 |
+| 来电弹屏脱敏匹配 | 按手机号哈希命中客户，仅返回脱敏档案（前3后4）与通话历史统计 |
+| 话单幂等同步 | 同一 `vendorCallId` 重复提交仅入库一条 `crm_call_record`，返回既有记录 |
+| 通话关联完整性 | 关联客户/投诉工单/会话/预约成功回显 `linkType/linkNo`；目标不存在 404 |
+| 录音访问审计 | 每次录音授权写入 `CALL_RECORDING_ACCESS` 审计并累计 `accessCount`；无录音 422 |
+| 短信模板变量提取 | `{{变量}}` 自动提取变量清单；编码重复 409；停用后按模板发送 422 |
+| 消息幂等去重 | 相同 `bizKey` 重复提交返回既有消息，不重复发送 |
+| 指数退避重试 | 失败按 300s×2^(n-1) 排期最多 3 次，超限仅人工重试；条件更新防并发重发 |
+| 定时派发 | 60 秒定时任务与 `POST /callcenter/messages/dispatch` 返回 `scanned/sent/failed` |
+| 号码脱敏存储 | 号码仅存密文/HMAC 哈希/脱敏值，接口与审计明文号码 0 条 |
+| 数据库迁移 | `V17__callcenter.sql` 新增通话记录、录音索引、短信模板、消息 Outbox 4 张表、2 个业务号序列、3 条短信模板种子与 6 项权限 |
+
+## 商保中心（CRM-018）
+
+`backend/crm-insurance` 模块承接保险公司与保单主数据、商保案件 12 态状态机、询价/预授权/理赔、材料登记、邮件往来与按公司+账期对账。数据库迁移 `V18__insurance.sql` 新增 8 张表、1 个业务号序列与 6 项权限，接口契约见 `04-openapi.yaml` 的「商保中心」tag。
+
+- **保险公司与保单**：`GET/POST /api/v1/insurance/companies`、`GET/PUT /insurance/companies/{id}`、`POST /insurance/companies/{id}/status`；`GET/POST /insurance/policies`、`GET /insurance/policies/{id}`、`POST /insurance/policies/{id}/status`。公司编码与保单号全局唯一，重复返回 409；客户不存在 404；停用公司不得新建保单（422）；保单非 `active` 或已过期不得建案（422）；保单有效期起止倒置返回 400。联系人电话仅存 HMAC 哈希与前 3 后 4 脱敏值。
+- **案件 12 态状态机**：`registered → eligibility_check → quotation → pre_authorization → service_done → claim_submitted → under_review → approved/partially_approved/rejected → reconciled`；`claim_submitted` 也可先进入 `supplement_required` 补充材料后再回 `under_review`，三种理赔结论均可进入 `reconciled`，`reconciled` 为终态。非法流转返回 422，目标状态必备字段缺失返回 422，每次流转均写入 `crm_insurance_event` 审计（起止状态、操作人、备注与金额快照）。
+- **询价/预授权/理赔**：`POST /insurance/cases/{id}/transition`；按状态机校验后分别落库询价金额与时间、预授权号/金额与时间、理赔号与提交时间、理赔结论/核定金额/原因与决定时间，回款到账金额单独记录。
+- **材料 SHA-256 哈希**：`GET/POST /insurance/cases/{id}/materials`、`POST /insurance/materials/{id}/status`；材料登记必须提供对象存储键与 64 位十六进制 SHA-256 哈希，格式非法返回 400，材料状态为 `pending/valid/invalid`；已对账案件不允许新增材料（422）。
+- **邮件 Message-ID 幂等与附件哈希**：`GET/POST /insurance/cases/{id}/emails`；入站邮件按 Message-ID 唯一，相同 `messageId` 重复提交幂等返回既有邮件、不重复入库；每个附件必须提供 SHA-256 哈希，缺失或格式非法返回 400。
+- **人工分派**：`POST /insurance/cases/{id}/assign` 指定 `handlerUserId`；处理人不存在返回 404，分派与流转均写入 `crm_insurance_event`。
+- **对账按公司+账期汇总**：`GET/POST /insurance/reconciliations`、`GET /insurance/reconciliations/{id}`、`POST /insurance/reconciliations/{id}/confirm`；按账期内已决案件汇总医院应收与实际到账，`|差额| < 0.01` 判为 `matched`，否则 `mismatch`；账期非 `YYYY-MM` 返回 400，公司不存在返回 404；同公司同账期重复生成按最新案件重算并更新同一批次，确认后批次锁定、重复确认返回 422。
+
+金额口径说明：
+
+| 金额口径 | 字段 | 说明 |
+|---|---|---|
+| 医院应收 | `hospitalReceivable` | 本次服务医院应收总额，独立口径 |
+| 患者自付 | `patientPay` | 患者自付部分，独立口径 |
+| 预计赔付 | `estimatedPayout` | 按保单、预授权与理赔结论测算的预计可赔金额，独立字段，**不得视为已收款**，不得被实际到账覆盖 |
+| 实际到账 | `actualReceived` | 保险公司实际回款金额，仅由对账/回款登记写入，独立字段 |
+
+> 四类金额分别存储与展示，状态流转、投保对账汇总均不得互相覆盖；收款与收入统计只认 `actualReceived`，`estimatedPayout` 不计入实收。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:insurance:read` | 查看保险公司、保单、案件、材料、邮件与对账数据 |
+| `crm:insurance:manage` | 维护保险公司与保单主数据、启停主数据 |
+| `crm:insurance:case:write` | 创建商保案件、人工分派处理人与状态流转 |
+| `crm:insurance:material:write` | 上传登记案件材料并标记材料有效性 |
+| `crm:insurance:email:write` | 登记商保往来邮件与附件哈希 |
+| `crm:insurance:reconcile` | 生成商保对账批次并确认对账结果 |
+
+> 上线提示：`V18__insurance.sql` 中 6 项商保权限默认仅授予 `SUPER_ADMIN`，建议按商保专员（`crm:insurance:read` + `crm:insurance:case:write`）、材料录入（`crm:insurance:material:write`）、邮件登记（`crm:insurance:email:write`）与对账复核（`crm:insurance:reconcile`）分岗授权，主数据维护单独授予 `crm:insurance:manage`。本期不直连保险公司理赔 API，`settlementType=api/email/manual` 仅表达结算通道；邮件接入需由邮件网关保证 Message-ID 与附件 SHA-256 哈希。
+
+### CRM-018 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 保险公司/保单主数据：公司编码与保单号重复返回 409，客户不存在 404，有效期倒置 400，停用公司新建保单 422 | 编码/保单号重复实测 409、有效期倒置实测 400；客户不存在与停用公司分支由单元测试覆盖 |
+| 案件创建：保单不存在 404，保单非生效中或已过期 422，初始状态 `registered` | 实测初始状态 `registered`、案件号 `IC8xxxxx`；404/422 分支由单元测试覆盖 |
+| 12 态状态机：仅允许既定迁移，非法流转 422，`reconciled` 终态不可再流转 | 实测 `eligibility_check → approved` 返回 422；完整 8 步迁移全部成功，终态约束由状态机白名单保证 |
+| 必备字段校验：询价金额、预授权号、理赔号、核定赔付金额、驳回原因、实际到账金额缺失分别返回 422 | 询价金额、预授权号、理赔号、实际到账缺失均实测 422；驳回原因与核定金额缺失由单元测试覆盖 |
+| 核定金额上限：核定赔付金额不得大于医院应收，超出返回 422 | 实测核定 99999 超过应收 10000 返回 422 |
+| 事件审计：创建、分派、状态流转、材料与邮件登记均写入 `crm_insurance_event`，含起止状态与操作人 | 实测单案件 8 条 `STATE_CHANGE` 事件均带 `fromState/toState`；材料、邮件事件独立留痕 |
+| 金额独立口径：`estimatedPayout` 与 `actualReceived` 独立存储、互不覆盖，收款统计只取 `actualReceived` | 实测审批后 `estimatedPayout=9000` 且 `actualReceived=0`；对账写入 `actualReceived=8500` 后预计赔付仍为 9000，差额 `-500` |
+| 材料哈希：`fileHash` 非 64 位十六进制返回 400，已对账案件新增材料 422，材料状态仅 `valid/invalid` | 实测非法哈希 400、64 位 SHA-256 登记成功且状态 `pending`；已对账拦截由单元测试覆盖 |
+| 邮件幂等与附件哈希：inbound 相同 `messageId` 反复提交仅一条且返回既有邮件，附件哈希缺失/非法 400 | 实测两条附件哈希入库、重复 `messageId` 返回同一邮件 ID、非法附件哈希 400 |
+| 人工分派：处理人不存在 404，分派结果回显 `handlerName` 并写入事件 | 接口与事件实现完成，冒烟未覆盖分派分支（由单元测试覆盖） |
+| 对账汇总：按公司+账期汇总医院应收与实际到账，账期非法 400，公司不存在 404，同公司同账期重算不重复建批次，重复确认 422 | 实测账期非法 400；汇总结论 `10000/0/-10000 mismatch` → 回款后 `10000/8500/-1500 mismatch`；确认成功、重复确认 422 |
+| 权限分权：6 项 `crm:insurance:*` 权限生效，只读账号写操作 403（材料/邮件/对账各自独立） | V18 已写入 6 项权限并授予 `SUPER_ADMIN`，全部写接口标注 `@PreAuthorize`；只读账号 403 未在冒烟中单独构造 |
+| 数据库迁移：`V18__insurance.sql` 8 张表、案件号序列、6 项权限可重复部署 | PostgreSQL 16.4 实测 Flyway 由 v17 增量迁移至 v18 成功，8 张表、`(company_id, period)` 唯一约束、`message_id` 部分唯一索引与 6 项权限均已创建 |
+
+## 运营分析（CRM-019）
+
+`backend/crm-analytics` 模块承接运营指标口径定义、运营看板、报表定义与取数、数据导出申请-审批-下载闭环，共 14 个接口。数据库迁移 `V19__analytics.sql` 新增 3 张表（`crm_metric_definition` 含 `caliber_description` 口径说明 NOT NULL、`crm_report_definition`、`crm_export_request` 含 `csv_content/file_hash/row_count`）、12 条种子指标、2 条种子报表（`RPT_METRIC_SUMMARY` / `RPT_CUSTOMER_DETAIL`）与 6 项权限（sort 790~840），接口契约见 `04-openapi.yaml` 的「Analytics」tag。
+
+- **指标定义（口径强制）**：`GET/POST /api/v1/analytics/metrics`、`PUT /analytics/metrics/{metricId}`、`PUT /analytics/metrics/{metricId}/status`；`caliberDescription` 指标口径说明与 `dataSource` 数据来源为必填（验收要求：每项指标必须有口径说明），指标编码全局唯一，重复返回 409；12 条种子指标覆盖新增客户数、客户总数、线索数、线索转化率、预约量、爽约率、订单实收金额、随访完成率、投诉量、电话接通率、短信送达率与商保实收金额。
+- **运营看板**：`GET /analytics/dashboard?from&to`；`from`/`to` 必填（YYYY-MM-DD），跨度超过 366 天返回 400；返回 `dataFrom/dataTo/generatedAt` 使数据时间范围与生成时间可追溯；`scopeAll=false` 时无组织归属的指标 `value=null` 且 `scopeNote` 说明需全院权限。
+- **报表定义与取数**：`GET/POST /analytics/reports`、`PUT /analytics/reports/{reportId}/status`、`GET /analytics/reports/{reportCode}/data?from&to`；报表类型 `metric_summary` 指标汇总 / `customer_detail` 客户明细；`customer_detail` 仅返回脱敏列（`customer_no/name/phone_masked/id_no_masked/source_code/status/created_at`），非全院数据权限用户查询返回 403；取数结果携带 `dataFrom/dataTo/generatedAt/rowCount`，满足报表可追溯要求。
+- **导出审批闭环**：`POST /analytics/exports` 提交申请（`reason` 必填）→ `PUT /analytics/exports/{exportId}/approve|reject` 审批（仅 `pending` 可处理，否则 422；驳回必须填写理由）→ `GET /analytics/exports/{exportId}/download` 下载；审批通过时生成脱敏 CSV 并记录 SHA-256 `fileHash` 与 `rowCount`，未批准下载返回 422；仅申请人本人或具备 `crm:analytics:export:approve` 者可下载（否则 403）；`GET /analytics/exports` 无审批权限的用户仅见本人申请。
+- **组织数据权限**：看板与报表取数按用户 DataScope（全院 / 本组织及下级 / 本组织 / 仅本人 / 自定义）生效，无全院权限不暴露无组织归属指标与未脱敏明细。
+- **审计**：`METRIC_CREATE` / `METRIC_UPDATE` / `METRIC_STATUS`、`REPORT_CREATE` / `REPORT_STATUS`、`EXPORT_REQUEST` / `EXPORT_APPROVE` / `EXPORT_REJECT` / `EXPORT_DOWNLOAD` 全部写入 `sys_audit_log`。
+- **错误码**：400 `VALIDATION_ERROR`、403 `FORBIDDEN`、404 `RESOURCE_NOT_FOUND`、409 `BUSINESS_CONFLICT`、422 `BUSINESS_RULE_FAILED`，统一 `ApiResponse` 包裹返回。
+
+| 权限 | 说明 |
+|---|---|
+| `crm:analytics:read` | 查看指标定义、运营看板、报表与导出申请记录 |
+| `crm:analytics:metric:manage` | 新建、修改指标定义与启用/停用指标 |
+| `crm:analytics:report:manage` | 新建报表定义与启用/停用报表 |
+| `crm:analytics:export:request` | 提交数据导出申请 |
+| `crm:analytics:export:approve` | 审批通过/驳回导出申请，并查看全部申请 |
+| `crm:analytics:export:download` | 下载已审批通过的脱敏 CSV 导出文件 |
+
+> 上线提示：`V19__analytics.sql` 中 6 项 `crm:analytics:*` 权限默认仅授予 `SUPER_ADMIN`，建议按数据查看（`crm:analytics:read`）、指标/报表配置（`crm:analytics:metric:manage`、`crm:analytics:report:manage`）、导出申请（`crm:analytics:export:request`）与导出审批/下载（`crm:analytics:export:approve`、`crm:analytics:export:download`）分岗授权，导出审批仅授予运营管理员，保证申请与审批互相制约、全程审计。
+
+### CRM-019 验收清单
+
+| 验收项 | 结果 |
+|---|---|
+| 每项指标必须有口径说明：`caliberDescription` 接口层必填（缺失 400）+ 数据库 `caliber_description` NOT NULL，看板卡片随指标携带口径 | 通过：冒烟实测 12 条种子指标口径说明齐备，缺失口径创建返回 400，看板卡片与汇总报表行均携带 `caliberDescription` |
+| 导出脱敏：审批生成脱敏 CSV（手机号/证件号仅脱敏值）并记录 SHA-256 哈希与行数，未批准下载 422、越权下载 403 | 通过：下载 CSV 含 `138****xxxx` 脱敏值、无明文手机号与 11 位连续数字；`file_hash` 为 64 位十六进制且记录行数；未批准下载 422、`self` 范围用户下载客户明细 403 |
+| 报表可追溯时间范围：看板与报表取数返回 `dataFrom/dataTo/generatedAt`，可核对数据时间范围与生成时间 | 通过：看板与报表响应均回显 `dataFrom/dataTo/generatedAt`，CSV 首行注释数据时间范围与生成时间；跨度 >366 天拒绝 400 |
+
 ## 健康检查与验收
 
 ```powershell
@@ -716,6 +844,8 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - CRM-014 在基线 `crm_complaint` 之上补充来源、建单人、开始/提交/结案人、升级标记、升级层级/时间/原因与更新时间，重建状态/类型/等级/来源约束并移除 `crm_staff` 外键；新增 `crm_complaint_action`、`crm_complaint_rectification`、`crm_complaint_feedback`、`crm_complaint_review` 4 张表、工单号序列与 5 项 `crm:complaint:*` 权限
 - CRM-015 在基线 `crm_chat_session` / `crm_chat_message` 之上补充优先级、入队/接管/最近消息时间、AI 摘要、患者授权范围、结束人与更新时间，重建状态/接待方/优先级约束并移除 `crm_staff` 外键改为关联 `sys_user`；新增 `crm_chat_handoff`、`crm_chat_event` 2 张表、会话号序列、消息幂等部分唯一索引与 3 项 `crm:chat:*` 权限
 - CRM-016 新增 `crm_kb_category`、`crm_kb_document`、`crm_kb_chunk`、`crm_kb_version`、`crm_kb_review`、`crm_ai_query_log` 6 张表、知识编号序列（`KB7xxxxx`）与 3 项 `crm:knowledge:*` 权限；切片按 `(document_id, doc_version, chunk_index)` 唯一，`doc_version = current_version` 为已发布版本、`+1` 为草稿版本
+- CRM-017 由 `V17__callcenter.sql` 新增 `crm_call_record`、`crm_call_recording`、`crm_sms_template`、`crm_message_outbox` 4 张表、2 个业务号序列、3 条短信模板种子与 6 项 `crm:call:*` / `crm:sms:*` 权限；通话记录以 `vendor_call_id` 唯一约束保证话单幂等，消息以 `biz_key` 唯一约束保证去重
+- CRM-018 由 `V18__insurance.sql` 新增 `crm_insurance_company`、`crm_insurance_policy`、`crm_insurance_case`、`crm_insurance_material`、`crm_insurance_email`、`crm_insurance_email_attachment`、`crm_insurance_event`、`crm_insurance_reconciliation` 8 张表、案件号序列 `crm_insurance_case_no_seq` 与 6 项 `crm:insurance:*` 权限；入站邮件以 `message_id` 部分唯一索引保证幂等，对账以 `(company_id, period)` 唯一约束保证同公司同账期唯一，金额字段以 `NUMERIC` 与 `CHECK >= 0` 约束
 - 迁移测试 `DatabaseMigrationTest` 在 CI 中连接真实 PostgreSQL 执行
 
 ## API 约定
@@ -726,7 +856,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 错误码遵循 `api/04-标准API接口规范.md`，由 `GlobalExceptionHandler` 统一输出；401/403 同样返回统一结构
 - 时间使用 ISO 8601；金额使用十进制字符串或 `numeric`，禁止浮点
 - 写接口统一校验权限、输入、状态机与 `Idempotency-Key`
-- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务、CRM-011 订单支付退款对账发票、CRM-012 会员充值次卡套餐共享授权、CRM-013 随访分类模板计划任务人工队列、CRM-014 投诉表扬工单分派整改反馈复核升级、CRM-015 在线客服会话消息排队接管转接与 CRM-016 AI 知识库分类文档上传审核版本下架 RAG 问答追溯接口）
+- 接口变更必须同步更新 `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`（已补充 CRM-002 系统管理、CRM-003 客户中心、CRM-004 家庭账户、CRM-005 HIS 集成、CRM-006 患者 360、CRM-007 客户运营、CRM-008 预约中心、CRM-009 陪诊服务、CRM-010 上门服务、CRM-011 订单支付退款对账发票、CRM-012 会员充值次卡套餐共享授权、CRM-013 随访分类模板计划任务人工队列、CRM-014 投诉表扬工单分派整改反馈复核升级、CRM-015 在线客服会话消息排队接管转接、CRM-016 AI 知识库分类文档上传审核版本下架 RAG 问答追溯接口、CRM-017 呼叫中心来电弹屏/通话记录/关联/录音授权、短信模板与消息 Outbox 派发重试接口与 CRM-018 商保中心保险公司/保单/案件/材料/邮件/对账接口）
 
 ## 已实现能力与明确未包含
 
@@ -756,6 +886,7 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 - 投诉表扬中心：投诉/表扬/建议统一建单与按等级 SLA、分派与转派、处理动作时间线、整改任务与核验、患者满意度反馈、提交复核、结案审核与退回（审核人与处理人分权）、手动升级与超时自动升级
 - 在线客服：会话与消息、首次明确要求人工仅确认、二次请求自动排队、投诉/紧急/敏感/低置信度直接转人工、转人工时生成 AI 接待摘要、按优先级与入队时间排队、条件更新并发接管、客服转接、结束会话、消息客户端号幂等、会话按接待人隔离（管理权限可查看全部历史）
 - AI 知识库与数字人：知识分类与文档、`.txt/.md` 上传解析与 ≤500 字合并切片、送审前患者标识敏感扫描拦截、审核发布版本快照与并发冲突保护、驳回退回草稿、失效知识下架即时退出检索、RAG 检索问答携带知识编号/版本/切片引用、低置信度提示转人工并可联动客服会话入队、AI 随访话术草稿、问答全程追溯留痕
+- 运营分析：指标定义强制口径说明与数据来源、12 条种子指标、运营看板与报表取数（返回数据时间范围与生成时间，可追溯）、客户明细报表仅返回脱敏列、导出申请-审批-下载闭环（审批生成脱敏 CSV 并记录 SHA-256 哈希与行数、未批准 422、越权 403）、组织数据权限按 DataScope 生效、指标/报表/导出 9 类审计动作全程留痕、`V19__analytics.sql` 迁移与 6 项 `crm:analytics:*` 权限
 - 敏感操作审计（登录、令牌、用户、角色、组织、客户、标签、家庭、代办授权、HIS 查询、患者 360 查看、渠道、线索、邀约、活动、预约/时段/提醒、陪诊师/排班/陪诊订单、上门服务目录/地址/订单/异常、订单/支付/退款/对账/发票、会员开户/充值/消费/积分/套餐/次卡/共享/退款返还、随访分类/模板/计划/任务/触发/分配/记录/升级/处置、投诉建单/分派/处理/整改/反馈/复核/升级/取消/超时扫描与客服会话创建/消息/转人工确认/入队/接管/转接/结束），支持按动作、资源、时间与数据范围查询
 - 管理端登录页、权限路由守卫、401 自动刷新、客户中心、患者 360、家庭账户、客户运营、预约中心、陪诊服务、上门服务、收银与订单、会员与权益、随访中心、投诉表扬、客服工作台、AI 知识库、标签、用户/角色/组织/审计管理页面
 - 移动端 H5 / 小程序骨架与后端连通性检测
@@ -763,13 +894,13 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 
 明确未包含（按任务逐步交付）：
 
-- 呼叫中心、短信触达、商保等业务模块（CRM-017 及后续任务）；外部大模型接入（本期 AI 数字人为内置检索式实现，接口契约已预留替换边界）
+- 商保中心（CRM-018）与真实保险公司理赔协议/邮件网关对接、只读账号 403 分权联调；接口契约、`V18__insurance.sql`、`backend/crm-insurance` 模块与管理端页面已交付并完成本地验收。外部大模型接入（本期 AI 数字人为内置检索式实现，接口契约已预留替换边界）
 - 单点登录（LDAP/CAS）、短信验证码登录、MFA（后续任务按医院要求扩展）
 - 真实 HIS 表结构、接口地址、患者主索引规则、支付与商保协议
 
-> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。CRM-012 的会员余额与积分变动全部写账本且条件更新防超扣，CRM-013 的随访风险规则在服务端评估、高风险任务只能由具备管理权限的角色处置，CRM-014 的投诉工单处理与结案审核按权限分权、审核人不得为当前处理人且超时升级采用条件更新防重复，CRM-015 的客服会话按接待人隔离、接管与转接使用条件更新防并发抢占、消息支持客户端号幂等且转人工记录与状态轨迹全程留痕，CRM-016 的知识文档送审前强制扫描身份证号/手机号等患者标识并拒绝入库、AI 仅检索已审核发布知识且答案必须携带可追溯引用、低置信度不臆答而是转人工。呼叫中心尚未实现。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
+> **安全提示**：CRM-003 已实现客户敏感字段加密与脱敏，CRM-004 已确保家庭关系不构成病历访问授权、代办授权可即时撤销，CRM-005 的 HIS 适配器只读、参数化且带只读账号校验与熔断，CRM-006 的患者 360 按分区逐项授权并明确标注数据来源与过期状态，CRM-007 的线索与活动参与人手机号同样加密存储且接口只返回脱敏值，CRM-008 的预约联系电话仅存密文/哈希/脱敏值且名额受数据库约束保护，CRM-009 的陪诊师与订单联系电话同样仅存密文/哈希/脱敏值且派单受资质与排班双重校验，CRM-010 的上门服务地址联系电话同样仅存密文/哈希/脱敏值且人员资质在派单与接单双重拦截，CRM-011 的支付回调强制 HMAC-SHA256 验签且重复回调按幂等回放、退款与对账均以条件更新防并发超额，CRM 收费只在主库记录流水不写 HIS 收费表。CRM-012 的会员余额与积分变动全部写账本且条件更新防超扣，CRM-013 的随访风险规则在服务端评估、高风险任务只能由具备管理权限的角色处置，CRM-014 的投诉工单处理与结案审核按权限分权、审核人不得为当前处理人且超时升级采用条件更新防重复，CRM-015 的客服会话按接待人隔离、接管与转接使用条件更新防并发抢占、消息支持客户端号幂等且转人工记录与状态轨迹全程留痕，CRM-016 的知识文档送审前强制扫描身份证号/手机号等患者标识并拒绝入库、AI 仅检索已审核发布知识且答案必须携带可追溯引用、低置信度不臆答而是转人工。CRM-017 的来电弹屏与通话/消息接口仅返回脱敏号码（前3后4）、号码以 HMAC-SHA-256 哈希检索存储，录音访问需独立权限 `crm:call:recording:read` 且每次访问写入审计，呼叫中心未接入时返回 502、禁止伪造录音地址。客户加密密钥、初始管理员、JWT 密钥与 HIS 连接凭据仅用于本地开发，生产部署前必须更换并妥善保管；更换客户加密密钥会导致历史密文无法解密，必须先完成密钥轮换迁移。禁止在开发/测试环境写入真实患者数据。
 
-## 本地验证记录（CRM-001 ~ CRM-016）
+## 本地验证记录（CRM-001 ~ CRM-019）
 
 | 验证项 | 命令 | 结果 |
 |---|---|---|
@@ -874,6 +1005,24 @@ Invoke-RestMethod 'http://localhost:8080/api/v1/system/users?page=1&pageSize=10'
 | 知识下架即时生效 | 下架（缺原因/带原因）后重复原问题检索 | 缺原因 400；下架后检索结果不再包含该知识编号，历史版本与审核记录保留 |
 | 问答日志追溯 | 查询 `/knowledge/rag/logs` | 每次问答留痕问题、答案、置信度、引用来源与是否转人工 |
 | AI 知识库管理端构建 | `npm run build` | 通过，`KnowledgeView`（知识文档/分类管理/AI 问答测试/问答记录四标签页 + 详情抽屉）路由与页面正常打包，`vue-tsc` 类型检查无错误 |
+| CRM-017 OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 通过：新增 tag「呼叫中心与短信」、11 个 `/callcenter` 路径与 14 个 schema，全文件 212 个路径、220 个 schema，876 处 `$ref` 引用全部可解析 |
+| CRM-017 后端单元测试 | `mvnw test`（JDK 21，全 19 模块） | BUILD SUCCESS；`crm-callcenter` 22 个用例全部通过（弹屏命中/未命中、话单幂等、脱敏存储、关联校验、录音 422/502、模板变量提取与 409/422、bizKey 去重、退避与超限置空、条件更新防重发、人工重试规则） |
+| CRM-017 V17 迁移内容 | `DatabaseMigrationTest` 连接 PostgreSQL 16.4 执行 | 通过：Flyway 从 v16 增量迁移到 v17（17/17 全部成功）；`crm_call_record`、`crm_call_recording`、`crm_sms_template`、`crm_message_outbox` 4 张表、`CC9xxxxx`/`MS9xxxxx` 2 个业务号序列、3 条短信模板种子、6 项 `crm:call:*` / `crm:sms:*` 权限与 `SUPER_ADMIN` 授权均已创建 |
+| CRM-017 接口冒烟（27 项断言） | 启动 `crm-api.jar` 连接本地 PostgreSQL 后逐项调用 | 全部通过：来电弹屏命中/未命中且仅返回脱敏号；话单 `vendorCallId` 重复提交返回同一记录、时长自动计算；通话关联客户回显 `linkNo`、关联不存在工单 404；录音无记录 422、未接入 502 不伪造地址；模板 `{{变量}}` 自动提取、编码重复 409、停用后发送 422；消息 `bizKey` 去重幂等、变量缺失 422、手动派发置 `SENT`、已发送重试拒绝 422 |
+| CRM-017 敏感数据与审计 | `psql` 查询 `crm_call_record` / `crm_message_outbox` / `sys_audit_log` | 通过：全库 0 条明文号码（仅 64 位 HMAC 哈希 + 前3后4 脱敏值）；审计留痕 `CALL_POPUP`、`CALL_RECORD_CREATE`、`CALL_RECORD_LINK`、`MESSAGE_ENQUEUE`、`MESSAGE_DISPATCH`，明细不含完整号码 |
+| CRM-017 管理端构建 | `npm run build`（vue-tsc + vite） | 通过，`CallCenterView`（通话记录/来电弹屏/短信模板/消息队列四标签页 + 详情抽屉）路由与页面正常打包，类型检查无错误 |
+| CRM-018 OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 通过：新增 tag「商保中心」、17 个 `/insurance` 路径（24 个操作）与 18 个 schema，全文件 228 个路径、238 个 schema，969 处 `$ref` 全部可解析 |
+| CRM-018 后端单元测试 | `mvnw test`（JDK 21，全 20 模块） | BUILD SUCCESS；`crm-insurance` 26 个用例全部通过（主数据 409/404/400/422、12 态状态机与必备字段、核定上限、金额隔离、材料与附件哈希、邮件 Message-ID 幂等、对账汇总与重复确认） |
+| CRM-018 V18 迁移内容 | `DatabaseMigrationTest` 连接 PostgreSQL 16.4 执行 | 通过：Flyway 从 v17 增量迁移到 v18（14 个迁移用例全绿）；`crm_insurance_company/policy/case/material/email/email_attachment/event/reconciliation` 8 张表、`crm_insurance_case_no_seq`、`(company_id, period)` 唯一约束、`message_id` 部分唯一索引与 6 项 `crm:insurance:*` 权限均已创建 |
+| CRM-018 接口冒烟（37 项断言） | 启动 `crm-api.jar` 连接本地 PostgreSQL 后逐项调用 | 全部通过：公司/保单编码重复 409、有效期倒置 400、联系人电话脱敏；案件初始 `registered`；非法流转 422、询价/预授权/理赔/对账必备字段 422、核定金额超应收 422；审批后 `estimatedPayout=9000`、`actualReceived=0`；回款后 `actualReceived=8500` 且预计赔付保持 9000、差额 `-500`；材料非法哈希 400、邮件附件哈希入库、重复 `messageId` 幂等；对账两轮汇总与确认、重复确认 422；单案件 8 条状态事件 |
+| CRM-018 敏感数据与审计 | `psql` 查询 `crm_insurance_company` / `crm_insurance_email_attachment` / `sys_audit_log` | 通过：公司联系号码 0 条明文（64 位 HMAC 哈希 + `139****1111` 脱敏）；全部邮件附件哈希均为 64 位十六进制；审计留痕 `INSURANCE_COMPANY_CREATE`、`INSURANCE_POLICY_CREATE`、`INSURANCE_CASE_CREATE`、`INSURANCE_CASE_TRANSITION`、`INSURANCE_MATERIAL_ADD`、`INSURANCE_EMAIL_RECORD`、`INSURANCE_RECONCILE_GENERATE`、`INSURANCE_RECONCILE_CONFIRM` |
+| CRM-018 管理端构建 | `npm run build`（vue-tsc + vite） | 通过，`InsuranceView`（保险公司/保单/商保案件/对账中心四标签页 + 案件详情抽屉）路由与页面正常打包，类型检查无错误 |
+| CRM-019 OpenAPI 契约 | YAML 解析与 `$ref` 校验 | 通过：新增 tag「Analytics」、11 个 `/analytics` 路径（14 个操作）与 15 个 schema，download 端点为 `text/csv`；全文件 1014 处 `$ref`（284 个唯一）全部可解析、无悬空 |
+| CRM-019 后端单元测试 | `mvnw test`（JDK 21，全 21 模块） | BUILD SUCCESS；`crm-analytics` 20 个用例全部通过（指标口径必填 400、编码重复 409、启停、时间跨度 366 天、比率分母为 0 不计算、全院范围不拼过滤条件、受限范围 scopeNote、导出仅 pending 可批/驳回必填原因/未批准 422/越权 403、CSV 无 11 位连续数字、file_hash 64 位十六进制） |
+| CRM-019 V19 迁移内容 | `DatabaseMigrationTest` 连接 PostgreSQL 16.4 执行 | 通过：全新库 V1→V19 全链路 14 个迁移用例全绿；`crm_metric_definition/report_definition/export_request` 3 张表、状态 CHECK、`(status, created_at)` 索引、12 条口径说明齐备的种子指标、2 条种子报表与 6 项 `crm:analytics:*` 权限均已创建 |
+| CRM-019 接口冒烟（42 项断言） | 启动 `crm-api.jar` 连接本地 PostgreSQL 后逐项调用 | 全部通过：种子指标 12 条且口径齐备；看板 scopeAll、卡片 ≥12、`dataFrom/dataTo/generatedAt` 回显、跨度 >366 天 400；指标创建重复 409、缺口径 400、更新/启停生效；汇总报表 12 行含口径列；客户明细仅脱敏手机号；导出 pending→批准（哈希 64 位、行数≥1）→重复批准 422→下载 CSV 含 `****`、无明文手机号、无 11 位连续数字；驳回必填原因、被驳回下载 422；`self` 范围分析师：scopeAll=false、客户指标 value=null+范围提示、客户明细 403、审批 403、仅见本人申请 |
+| CRM-019 敏感数据与审计 | `psql` 查询 `crm_export_request` / `sys_audit_log` | 通过：`csv_content` 含 11 位连续数字的记录 0 条；已批准导出 `file_hash` 全部为 64 位十六进制；审计留痕 `METRIC_CREATE/METRIC_UPDATE/METRIC_STATUS`、`REPORT_CREATE/REPORT_STATUS`、`EXPORT_REQUEST/EXPORT_APPROVE/EXPORT_REJECT/EXPORT_DOWNLOAD` 九类动作齐全 |
+| CRM-019 管理端构建 | `npm run build`（vue-tsc + vite） | 通过，`AnalyticsView`（指标概览/指标口径/报表查询/导出审批四标签页）路由与页面正常打包，类型检查无错误 |
 | Compose 配置 | YAML 结构校验 | 通过；本机未安装 Docker，未实际启动容器 |
 
 ## CI

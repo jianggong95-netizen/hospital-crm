@@ -35,6 +35,9 @@
     <module>crm-complaint</module>
     <module>crm-chat</module>
     <module>crm-knowledge</module>
+    <module>crm-callcenter</module>
+    <module>crm-insurance</module>
+    <module>crm-analytics</module>
     <module>crm-boot</module>
   </modules>
 

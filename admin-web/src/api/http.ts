@@ -86,6 +86,10 @@ export const api = {
     const response = await http.get<ApiEnvelope<T>>(url, { params })
     return unwrap(response.data)
   },
+  async getBlob(url: string, params?: object): Promise<Blob> {
+    const response = await http.get<Blob>(url, { params, responseType: 'blob' })
+    return response.data
+  },
   async post<T>(url: string, payload?: unknown): Promise<T> {
     const response = await http.post<ApiEnvelope<T>>(url, payload)
     return unwrap(response.data)
