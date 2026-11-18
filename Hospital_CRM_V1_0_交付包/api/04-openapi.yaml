@@ -5597,6 +5597,277 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/BusinessRuleFailed" }
 
+  /chat/queue:
+    get:
+      tags: [Chat]
+      summary: 查询人工队列
+      description: 仅返回排队中的会话，按优先级与入队时间排序，含等待时长与队列位置。
+      x-required-permission: crm:chat:handle
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChatQueueItem" }
+  /chat/sessions:
+    get:
+      tags: [Chat]
+      summary: 分页查询客服会话
+      description: 普通客服仅能看到排队会话与本人接待的会话；具备 crm:chat:manage 权限可查看全部历史。
+      x-required-permission: crm:chat:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+          description: 会话号关键字
+        - in: query
+          name: status
+          schema: { type: string, enum: [AI, QUEUED, ACTIVE, CLOSED] }
+        - in: query
+          name: channel
+          schema: { type: string, enum: [web, h5, mini_program, app, phone, wechat] }
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: assigneeId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: priority
+          schema: { type: string, enum: [low, normal, high, urgent] }
+        - in: query
+          name: dateFrom
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChatSessionView" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Chat]
+      summary: 创建客服会话
+      description: 会话创建后进入 AI 接待，记录患者授权范围。
+      x-required-permission: crm:chat:handle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatCreateSessionRequest" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /chat/sessions/{sessionId}:
+    get:
+      tags: [Chat]
+      summary: 查询会话详情
+      description: 返回会话、最近 200 条消息、转人工记录与会话轨迹；无权限访问他人会话返回 403。
+      x-required-permission: crm:chat:read
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionDetail" }
+        "403": { description: 无权查看该会话 }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /chat/sessions/{sessionId}/messages:
+    get:
+      tags: [Chat]
+      summary: 分页查询会话消息
+      x-required-permission: crm:chat:read
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChatMessageView" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+        "403": { description: 无权查看该会话 }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Chat]
+      summary: 发送消息
+      description: 客服消息要求会话处于人工接待且为当前接待人；AI 消息仅可在 AI 接待阶段写入；支持 clientMessageId 幂等。
+      x-required-permission: crm:chat:handle
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatMessageCreateRequest" }
+      responses:
+        "200":
+          description: 发送成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionDetail" }
+        "403": { description: 无权操作该会话 }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /chat/sessions/{sessionId}/handoff:
+    post:
+      tags: [Chat]
+      summary: 请求转人工
+      description: explicit 首次返回 needsConfirmation=true，仅提示确认；第二次自动入队。投诉、紧急、敏感与低置信度直接入队。入队时生成 AI 接待摘要。
+      x-required-permission: crm:chat:handle
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatHandoffRequest" }
+      responses:
+        "200":
+          description: 处理成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatHandoffResult" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 会话已被其他请求转入人工队列 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /chat/sessions/{sessionId}/claim:
+    post:
+      tags: [Chat]
+      summary: 接管会话
+      description: 仅排队中的会话可接管；条件更新保证并发接管只有一个成功，接管后返回完整会话上下文、AI 摘要与患者授权范围。
+      x-required-permission: crm:chat:handle
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 接管成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 会话已被其他客服接管 }
+  /chat/sessions/{sessionId}/transfer:
+    post:
+      tags: [Chat]
+      summary: 转接会话
+      description: 当前接待客服可转接本人会话；具备 crm:chat:manage 权限可转接任意进行中会话。
+      x-required-permission: crm:chat:handle
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatTransferRequest" }
+      responses:
+        "200":
+          description: 转接成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionDetail" }
+        "403": { description: 仅当前接待客服或主管可转接 }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 会话状态已变化 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /chat/sessions/{sessionId}/close:
+    post:
+      tags: [Chat]
+      summary: 结束会话
+      description: 当前接待客服或主管可结束会话，结束后终态不可再发送消息。
+      x-required-permission: crm:chat:handle
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatCloseRequest" }
+      responses:
+        "200":
+          description: 已结束
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ChatSessionView" }
+        "403": { description: 仅当前接待客服或主管可结束 }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -7800,4 +8071,139 @@ components:
       type: object
       properties:
         escalated: { type: integer, description: "本次扫描升级的工单数" }
+    ChatSessionView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sessionNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        phoneMasked: { type: string, nullable: true }
+        channel: { type: string, enum: [web, h5, mini_program, app, phone, wechat] }
+        status: { type: string, enum: [AI, QUEUED, ACTIVE, CLOSED] }
+        currentHandlerType: { type: string, enum: [ai, human] }
+        priority: { type: string, enum: [low, normal, high, urgent] }
+        assignedStaffId: { type: string, format: uuid, nullable: true }
+        assignedStaffName: { type: string, nullable: true }
+        handoffRequestCount: { type: integer }
+        queueEnteredAt: { type: string, format: date-time, nullable: true }
+        claimedAt: { type: string, format: date-time, nullable: true }
+        lastMessageAt: { type: string, format: date-time, nullable: true }
+        lastMessagePreview: { type: string, nullable: true }
+        aiSummary: { type: string, nullable: true, description: "转人工时生成的 AI 接待摘要，接管时随上下文返回" }
+        authorizationScope: { type: string, description: "患者授权范围" }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time, nullable: true }
+        closedBy: { type: string, format: uuid, nullable: true }
+        closedByName: { type: string, nullable: true }
+        waitingSeconds: { type: integer, format: int64 }
+    ChatMessageView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        senderType: { type: string, enum: [CUSTOMER, AI, STAFF, SYSTEM] }
+        senderId: { type: string, format: uuid, nullable: true }
+        senderName: { type: string, nullable: true }
+        content: { type: string }
+        contentType: { type: string, enum: [text, image, file, system] }
+        aiConfidence: { type: number, format: double, nullable: true, minimum: 0, maximum: 1 }
+        knowledgeRefs:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+    ChatHandoffView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        requestCount: { type: integer }
+        reason: { type: string }
+        mode: { type: string, enum: [CONFIRM, SECOND, DIRECT, TRANSFER] }
+        status: { type: string, enum: [PENDING_CONFIRM, QUEUED, ACCEPTED, TRANSFERRED, CANCELLED] }
+        fromStaffId: { type: string, format: uuid, nullable: true }
+        fromStaffName: { type: string, nullable: true }
+        toStaffId: { type: string, format: uuid, nullable: true }
+        toStaffName: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        requestedAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true }
+    ChatEventView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        eventType: { type: string, enum: [CREATED, HANDOFF_REQUESTED, QUEUED, CLAIMED, TRANSFERRED, CLOSED] }
+        fromStatus: { type: string, nullable: true }
+        toStatus: { type: string, nullable: true }
+        operatorId: { type: string, format: uuid, nullable: true }
+        operatorName: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ChatSessionDetail:
+      type: object
+      properties:
+        session: { $ref: "#/components/schemas/ChatSessionView" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/ChatMessageView" }
+        handoffs:
+          type: array
+          items: { $ref: "#/components/schemas/ChatHandoffView" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/ChatEventView" }
+    ChatQueueItem:
+      type: object
+      properties:
+        sessionId: { type: string, format: uuid }
+        sessionNo: { type: string }
+        customerName: { type: string, nullable: true }
+        phoneMasked: { type: string, nullable: true }
+        channel: { type: string }
+        priority: { type: string, enum: [low, normal, high, urgent] }
+        waitingSeconds: { type: integer, format: int64 }
+        queuePosition: { type: integer }
+        lastMessage: { type: string, nullable: true }
+        aiSummary: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+    ChatHandoffResult:
+      type: object
+      properties:
+        needsConfirmation: { type: boolean, description: "首次明确要求人工时为 true，仅提示确认" }
+        message: { type: string }
+        queuePosition: { type: integer, nullable: true }
+        session: { $ref: "#/components/schemas/ChatSessionView" }
+    ChatCreateSessionRequest:
+      type: object
+      required: [customerId, channel]
+      properties:
+        customerId: { type: string, format: uuid }
+        channel: { type: string, enum: [web, h5, mini_program, app, phone, wechat] }
+        authorizationScope: { type: string, maxLength: 200, nullable: true, description: "默认 basic" }
+    ChatMessageCreateRequest:
+      type: object
+      required: [senderType, content]
+      properties:
+        senderType: { type: string, enum: [CUSTOMER, AI, STAFF, SYSTEM] }
+        content: { type: string, maxLength: 4000 }
+        contentType: { type: string, enum: [text, image, file, system], nullable: true }
+        aiConfidence: { type: number, format: double, minimum: 0, maximum: 1, nullable: true }
+        knowledgeRefs:
+          type: array
+          items: { type: string }
+        clientMessageId: { type: string, maxLength: 64, nullable: true, description: "渠道消息号，用于幂等" }
+    ChatHandoffRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, enum: [explicit, complaint, urgent, sensitive, low_confidence] }
+        note: { type: string, maxLength: 500, nullable: true }
+    ChatTransferRequest:
+      type: object
+      required: [toStaffId]
+      properties:
+        toStaffId: { type: string, format: uuid }
+        note: { type: string, maxLength: 500, nullable: true }
+    ChatCloseRequest:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 500, nullable: true }
 

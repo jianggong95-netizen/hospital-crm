@@ -59,9 +59,9 @@ export const phases: Phase[] = [
     key: 'P4',
     name: '智能客服',
     focus: '在线客服、知识库、AI 数字人、呼叫中心',
-    status: 'planned',
+    status: 'active',
     tasks: [
-      'CRM-015 在线客服与人工工作台',
+      'CRM-015 在线客服与人工工作台（已完成）',
       'CRM-016 AI 知识库与数字人',
       'CRM-017 呼叫中心与短信'
     ]

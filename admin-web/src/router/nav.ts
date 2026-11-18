@@ -83,6 +83,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:complaint:read'
   },
   {
+    path: '/chat',
+    label: '客服工作台',
+    short: '客',
+    tint: 'linear-gradient(135deg, #2f7f74, #63a89d)',
+    permission: 'crm:chat:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',
