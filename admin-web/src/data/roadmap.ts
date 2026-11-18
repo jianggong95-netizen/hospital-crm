@@ -62,7 +62,7 @@ export const phases: Phase[] = [
     status: 'active',
     tasks: [
       'CRM-015 在线客服与人工工作台（已完成）',
-      'CRM-016 AI 知识库与数字人',
+      'CRM-016 AI 知识库与数字人（已完成）',
       'CRM-017 呼叫中心与短信'
     ]
   },

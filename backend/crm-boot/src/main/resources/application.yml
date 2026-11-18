@@ -27,6 +27,10 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: ${CRM_KB_MAX_FILE_SIZE:5MB}
+      max-request-size: ${CRM_KB_MAX_REQUEST_SIZE:6MB}
   jackson:
     default-property-inclusion: non_null
     serialization:

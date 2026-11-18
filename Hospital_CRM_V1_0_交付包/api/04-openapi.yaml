@@ -22,6 +22,7 @@ tags:
   - name: Orders
   - name: Followups
   - name: Chat
+  - name: Knowledge
   - name: Complaints
   - name: Insurance
 paths:
@@ -5868,6 +5869,357 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/BusinessRuleFailed" }
 
+  /knowledge/categories:
+    get:
+      tags: [Knowledge]
+      summary: 查询知识分类
+      x-required-permission: crm:knowledge:read
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/KbCategoryView" }
+    post:
+      tags: [Knowledge]
+      summary: 创建知识分类
+      x-required-permission: crm:knowledge:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbCategoryRequest" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbCategoryView" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/categories/{categoryId}:
+    put:
+      tags: [Knowledge]
+      summary: 更新知识分类
+      x-required-permission: crm:knowledge:write
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbCategoryRequest" }
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbCategoryView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents:
+    get:
+      tags: [Knowledge]
+      summary: 分页查询知识文档
+      x-required-permission: crm:knowledge:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+          description: 标题或知识编号关键字
+        - in: query
+          name: categoryId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, REVIEWING, PUBLISHED, OFFLINE] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/KbDocumentView" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Knowledge]
+      summary: 新建知识文档
+      description: 手工录入纯文本知识，保存时自动按不超过 500 字合并切片，初始为草稿状态。
+      x-required-permission: crm:knowledge:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbCreateDocumentRequest" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/upload:
+    post:
+      tags: [Knowledge]
+      summary: 上传知识文件并解析切片
+      description: 支持 .txt/.md 文本文件（不超过 5MB），解析为草稿切片；上传不等于发布，AI 不会引用未审核内容。
+      x-required-permission: crm:knowledge:write
+      parameters:
+        - in: query
+          name: title
+          schema: { type: string, maxLength: 200 }
+        - in: query
+          name: categoryId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: summary
+          schema: { type: string, maxLength: 500 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: 已解析为草稿文档
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}:
+    get:
+      tags: [Knowledge]
+      summary: 查询知识文档详情
+      description: 返回文档、切片（含草稿版本）、版本快照与审核留痕。
+      x-required-permission: crm:knowledge:read
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Knowledge]
+      summary: 更新文档标题、分类与摘要
+      x-required-permission: crm:knowledge:write
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbUpdateMetaRequest" }
+      responses:
+        "200":
+          description: 已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}/content:
+    put:
+      tags: [Knowledge]
+      summary: 更新知识内容（重建草稿切片）
+      description: 仅草稿或已下架文档可编辑；编辑结果写入 current_version+1 的草稿切片，审核发布后才生效。
+      x-required-permission: crm:knowledge:write
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbUpdateContentRequest" }
+      responses:
+        "200":
+          description: 已更新草稿切片
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}/submit:
+    post:
+      tags: [Knowledge]
+      summary: 提交审核
+      description: 草稿送审前执行敏感信息扫描（身份证号、手机号等患者标识），命中返回 422 并拒绝入库。
+      x-required-permission: crm:knowledge:write
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: 已进入待审核
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 文档状态已变化 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}/approve:
+    post:
+      tags: [Knowledge]
+      summary: 审核通过并发布
+      description: 发布后版本号 +1，草稿切片转正并生成版本快照；并发审核冲突返回 409。
+      x-required-permission: crm:knowledge:review
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbReviewActionRequest" }
+      responses:
+        "200":
+          description: 已发布
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 已有新版本待审核或状态已变化 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}/reject:
+    post:
+      tags: [Knowledge]
+      summary: 审核驳回
+      description: 驳回原因必填，文档退回草稿状态。
+      x-required-permission: crm:knowledge:review
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbReviewActionRequest" }
+      responses:
+        "200":
+          description: 已驳回
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 文档状态已变化 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/documents/{documentId}/offline:
+    post:
+      tags: [Knowledge]
+      summary: 知识下架
+      description: 下架原因必填；下架后 AI 检索立即不再引用该知识，保留历史版本与审核记录。
+      x-required-permission: crm:knowledge:review
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbOfflineRequest" }
+      responses:
+        "200":
+          description: 已下架
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbDocumentView" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: 文档状态已变化 }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/rag/ask:
+    post:
+      tags: [Knowledge]
+      summary: RAG 检索问答
+      description: 仅检索已发布文档的当前版本切片；答案携带知识编号、版本与切片引用，低置信度返回 needsHandoff 提示转人工，scene=followup 输出随访话术草稿。每次问答写入追溯日志。
+      x-required-permission: crm:knowledge:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/KbAskRequest" }
+      responses:
+        "200":
+          description: 问答完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KbAskResult" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /knowledge/rag/logs:
+    get:
+      tags: [Knowledge]
+      summary: 分页查询 AI 问答记录
+      x-required-permission: crm:knowledge:read
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/KbQueryLogView" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -5913,6 +6265,11 @@ components:
     ParticipantId:
       in: path
       name: participantId
+      required: true
+      schema: { type: string, format: uuid }
+    DocumentId:
+      in: path
+      name: documentId
       required: true
       schema: { type: string, format: uuid }
     TypeCode:
@@ -8206,4 +8563,163 @@ components:
       type: object
       properties:
         reason: { type: string, maxLength: 500, nullable: true }
+    KbCategoryView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        sortOrder: { type: integer }
+        status: { type: string, enum: [active, disabled] }
+        createdAt: { type: string, format: date-time }
+    KbCategoryRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9_-]{2,64}$' }
+        name: { type: string, maxLength: 120 }
+        sortOrder: { type: integer, minimum: 1, maximum: 9999 }
+        status: { type: string, enum: [active, disabled] }
+    KbDocumentView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        docNo: { type: string, description: 知识编号，如 KB700001 }
+        title: { type: string }
+        categoryId: { type: string, format: uuid, nullable: true }
+        categoryName: { type: string, nullable: true }
+        summary: { type: string, nullable: true }
+        sourceType: { type: string, enum: [manual, file] }
+        fileName: { type: string, nullable: true }
+        fileSize: { type: integer, format: int64, nullable: true }
+        fileType: { type: string, nullable: true }
+        status: { type: string, enum: [DRAFT, REVIEWING, PUBLISHED, OFFLINE] }
+        currentVersion: { type: integer }
+        draftChunkCount: { type: integer }
+        ownerId: { type: string, format: uuid, nullable: true }
+        ownerName: { type: string, nullable: true }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        offlineAt: { type: string, format: date-time, nullable: true }
+        offlineReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    KbChunkView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        docVersion: { type: integer, description: current_version 为已发布版本，current_version+1 为草稿版本 }
+        chunkIndex: { type: integer }
+        content: { type: string }
+        charCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+    KbVersionView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        versionNo: { type: integer }
+        title: { type: string }
+        summary: { type: string, nullable: true }
+        chunkCount: { type: integer }
+        changeNote: { type: string, nullable: true }
+        createdBy: { type: string, format: uuid, nullable: true }
+        createdByName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    KbReviewView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        versionNo: { type: integer }
+        action: { type: string, enum: [SUBMIT, APPROVE, REJECT, OFFLINE] }
+        reviewerId: { type: string, format: uuid, nullable: true }
+        reviewerName: { type: string, nullable: true }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    KbDocumentDetail:
+      type: object
+      properties:
+        document: { $ref: "#/components/schemas/KbDocumentView" }
+        chunks:
+          type: array
+          items: { $ref: "#/components/schemas/KbChunkView" }
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/KbVersionView" }
+        reviews:
+          type: array
+          items: { $ref: "#/components/schemas/KbReviewView" }
+    KbCreateDocumentRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title: { type: string, maxLength: 200 }
+        categoryId: { type: string, format: uuid, nullable: true }
+        summary: { type: string, maxLength: 500, nullable: true }
+        content: { type: string, maxLength: 200000 }
+    KbUpdateMetaRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 200 }
+        categoryId: { type: string, format: uuid, nullable: true }
+        summary: { type: string, maxLength: 500, nullable: true }
+    KbUpdateContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, maxLength: 200000 }
+        changeNote: { type: string, maxLength: 500, nullable: true }
+    KbReviewActionRequest:
+      type: object
+      properties:
+        comment: { type: string, maxLength: 500, nullable: true }
+    KbOfflineRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, maxLength: 500 }
+    KbAskRequest:
+      type: object
+      required: [question]
+      properties:
+        question: { type: string, maxLength: 500 }
+        topK: { type: integer, minimum: 1, maximum: 5, default: 3 }
+        scene: { type: string, enum: [chat, followup], default: chat }
+        sessionId: { type: string, format: uuid, nullable: true, description: 关联客服会话；低置信度时自动请求该会话转人工 }
+    KbRefView:
+      type: object
+      properties:
+        docId: { type: string, format: uuid }
+        docNo: { type: string }
+        title: { type: string }
+        version: { type: integer }
+        chunkId: { type: string, format: uuid }
+        chunkIndex: { type: integer }
+        score: { type: number, format: decimal }
+    KbAskResult:
+      type: object
+      properties:
+        logId: { type: string, format: uuid }
+        answer: { type: string }
+        confidence: { type: number, format: decimal, nullable: true }
+        refs:
+          type: array
+          items: { $ref: "#/components/schemas/KbRefView" }
+        needsHandoff: { type: boolean }
+        handoffMessage: { type: string, nullable: true }
+    KbQueryLogView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        question: { type: string }
+        answer: { type: string }
+        confidence: { type: number, format: decimal, nullable: true }
+        refs:
+          type: array
+          items: { type: string, description: '紧凑引用串，如 KB700001#v1#c1' }
+        scene: { type: string, enum: [chat, followup] }
+        sessionId: { type: string, format: uuid, nullable: true }
+        needsHandoff: { type: boolean }
+        askedBy: { type: string, format: uuid, nullable: true }
+        askedByName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
 

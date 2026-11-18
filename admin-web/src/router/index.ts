@@ -88,6 +88,12 @@ const router = createRouter({
           meta: { title: '客服工作台', permission: 'crm:chat:read' }
         },
         {
+          path: 'knowledge',
+          name: 'knowledge',
+          component: () => import('@/views/knowledge/KnowledgeView.vue'),
+          meta: { title: 'AI 知识库', permission: 'crm:knowledge:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

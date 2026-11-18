@@ -98,6 +98,10 @@ export const api = {
     const response = await http.patch<ApiEnvelope<T>>(url, payload)
     return unwrap(response.data)
   },
+  async upload<T>(url: string, form: FormData, params?: object): Promise<T> {
+    const response = await http.post<ApiEnvelope<T>>(url, form, { params })
+    return unwrap(response.data)
+  },
   async del<T>(url: string): Promise<T> {
     const response = await http.delete<ApiEnvelope<T>>(url)
     return unwrap(response.data)

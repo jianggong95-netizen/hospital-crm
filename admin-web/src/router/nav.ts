@@ -90,6 +90,13 @@ export const navItems: NavItem[] = [
     permission: 'crm:chat:read'
   },
   {
+    path: '/knowledge',
+    label: 'AI 知识库',
+    short: '知',
+    tint: 'linear-gradient(135deg, #5b5cc6, #8a8ade)',
+    permission: 'crm:knowledge:read'
+  },
+  {
     path: '/patient360',
     label: '患者 360',
     short: '患',
