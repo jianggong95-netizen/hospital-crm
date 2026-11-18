@@ -49,10 +49,10 @@ export const phases: Phase[] = [
     key: 'P3',
     name: '客户运营',
     focus: '随访、投诉表扬、消息触达',
-    status: 'planned',
+    status: 'done',
     tasks: [
       'CRM-013 随访中心（已完成）',
-      'CRM-014 投诉表扬中心'
+      'CRM-014 投诉表扬中心（已完成）'
     ]
   },
   {

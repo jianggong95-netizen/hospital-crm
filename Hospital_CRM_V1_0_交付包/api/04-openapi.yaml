@@ -5226,6 +5226,377 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/BusinessRuleFailed" }
 
+  /complaints:
+    get:
+      tags: [Complaints]
+      summary: 分页查询投诉表扬工单
+      x-required-permission: crm:complaint:read
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+          description: 工单号或标题关键字
+        - in: query
+          name: ticketType
+          schema: { type: string, enum: [complaint, praise, suggestion] }
+        - in: query
+          name: severity
+          schema: { type: string, enum: [low, normal, high, urgent] }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [OPEN, ASSIGNED, PROCESSING, RECTIFYING, PENDING_REVIEW, CLOSED, CANCELLED]
+        - in: query
+          name: assigneeId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: customerId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: escalated
+          schema: { type: boolean }
+        - in: query
+          name: overdue
+          schema: { type: boolean }
+          description: 为 true 时仅返回处理时限已过且未结案的工单
+        - in: query
+          name: dateFrom
+          schema: { type: string, format: date }
+        - in: query
+          name: dateTo
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ComplaintTicket" }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  total: { type: integer, format: int64 }
+    post:
+      tags: [Complaints]
+      summary: 新建投诉表扬工单
+      description: 未指定 dueAt 时按严重程度套用默认 SLA（urgent 4h/high 24h/normal 48h/low 72h）；指定 assigneeId 时直接进入 ASSIGNED。
+      x-required-permission: crm:complaint:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintCreateRequest" }
+      responses:
+        "200":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/escalation-scan:
+    post:
+      tags: [Complaints]
+      summary: 触发超时未结案扫描
+      description: 将已过处理时限且未结案的工单标记升级并写入时间线；条件更新保证同一工单不重复升级。
+      x-required-permission: crm:complaint:manage
+      responses:
+        "200":
+          description: 扫描完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintScanResult" }
+  /complaints/{ticketId}:
+    get:
+      tags: [Complaints]
+      summary: 查询工单详情
+      x-required-permission: crm:complaint:read
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /complaints/{ticketId}/assign:
+    put:
+      tags: [Complaints]
+      summary: 分派或转派工单
+      description: 仅 OPEN/ASSIGNED 状态可操作。
+      x-required-permission: crm:complaint:assign
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintAssignRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/start:
+    put:
+      tags: [Complaints]
+      summary: 开始处理工单
+      description: 仅 ASSIGNED 状态可开始处理。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/actions:
+    post:
+      tags: [Complaints]
+      summary: 登记处理动作
+      description: 联系、调查、回复、备注、整改、反馈、升级、复核等动作均写入时间线；终态工单拒绝登记。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintActionCreateRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/rectifications:
+    post:
+      tags: [Complaints]
+      summary: 登记整改任务
+      description: 仅 PROCESSING/RECTIFYING 状态可登记，登记后工单进入 RECTIFYING。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintRectificationCreateRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/rectifications/{rectificationId}/submit:
+    put:
+      tags: [Complaints]
+      summary: 提交整改措施
+      description: 仅 PENDING 整改可提交，重复提交返回 422。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: rectificationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/feedback:
+    post:
+      tags: [Complaints]
+      summary: 登记患者反馈
+      description: 记录 1~5 分满意度评分、是否满意、意见与渠道。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintFeedbackCreateRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/submit-review:
+    put:
+      tags: [Complaints]
+      summary: 提交结案复核
+      description: 仅 PROCESSING/RECTIFYING 状态可提交；需至少一条处理记录且无未提交整改。
+      x-required-permission: crm:complaint:write
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/review:
+    put:
+      tags: [Complaints]
+      summary: 结案审核
+      description: 仅 PENDING_REVIEW 状态可审核；审核人不得为当前处理人。PASS 结案并核验整改，REJECT 退回 PROCESSING。
+      x-required-permission: crm:complaint:review
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintReviewRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicketDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/escalate:
+    put:
+      tags: [Complaints]
+      summary: 手动升级工单
+      x-required-permission: crm:complaint:manage
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintReasonRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /complaints/{ticketId}/cancel:
+    put:
+      tags: [Complaints]
+      summary: 取消工单
+      description: 终态工单不能取消。
+      x-required-permission: crm:complaint:manage
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComplaintReasonRequest" }
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ComplaintTicket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -7281,4 +7652,152 @@ components:
         price: { type: string, description: "十进制金额字符串" }
         serviceName: { type: string, nullable: true }
         requiredQualType: { type: string, nullable: true }
+    ComplaintTicket:
+      type: object
+      description: 投诉表扬工单；overdue 由处理时限与状态实时计算。
+      properties:
+        id: { type: string, format: uuid }
+        ticketNo: { type: string }
+        customerId: { type: string, format: uuid }
+        customerName: { type: string, nullable: true }
+        phoneMasked: { type: string, nullable: true }
+        ticketType: { type: string, enum: [complaint, praise, suggestion] }
+        severity: { type: string, enum: [low, normal, high, urgent] }
+        subject: { type: string }
+        description: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [OPEN, ASSIGNED, PROCESSING, RECTIFYING, PENDING_REVIEW, CLOSED, CANCELLED]
+        source: { type: string, enum: [manual, phone, online, h5, mini_program, his, letter] }
+        responsibleOrgId: { type: string, format: uuid, nullable: true }
+        responsibleOrgName: { type: string, nullable: true }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        assigneeName: { type: string, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true }
+        overdue: { type: boolean }
+        escalated: { type: boolean }
+        escalationLevel: { type: integer }
+        escalatedAt: { type: string, format: date-time, nullable: true }
+        escalationReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        closedAt: { type: string, format: date-time, nullable: true }
+        closedBy: { type: string, format: uuid, nullable: true }
+        closedByName: { type: string, nullable: true }
+    ComplaintAction:
+      type: object
+      description: 工单处理时间线，所有流转动作均落库。
+      properties:
+        id: { type: string, format: uuid }
+        actionType: { type: string }
+        fromStatus: { type: string, nullable: true }
+        toStatus: { type: string, nullable: true }
+        content: { type: string, nullable: true }
+        operatorId: { type: string, format: uuid, nullable: true }
+        operatorName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ComplaintRectification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        content: { type: string }
+        responsibleOrgId: { type: string, format: uuid, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [PENDING, SUBMITTED, VERIFIED] }
+        submittedAt: { type: string, format: date-time, nullable: true }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+        verifiedBy: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ComplaintFeedback:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        satisfied: { type: boolean }
+        comment: { type: string, nullable: true }
+        channel: { type: string }
+        createdAt: { type: string, format: date-time }
+    ComplaintReview:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reviewerId: { type: string, format: uuid }
+        reviewerName: { type: string, nullable: true }
+        decision: { type: string, enum: [PASS, REJECT] }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ComplaintTicketDetail:
+      type: object
+      properties:
+        ticket: { $ref: "#/components/schemas/ComplaintTicket" }
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/ComplaintAction" }
+        rectifications:
+          type: array
+          items: { $ref: "#/components/schemas/ComplaintRectification" }
+        feedbacks:
+          type: array
+          items: { $ref: "#/components/schemas/ComplaintFeedback" }
+        reviews:
+          type: array
+          items: { $ref: "#/components/schemas/ComplaintReview" }
+    ComplaintCreateRequest:
+      type: object
+      required: [customerId, ticketType, severity, subject, description]
+      properties:
+        customerId: { type: string, format: uuid }
+        ticketType: { type: string, enum: [complaint, praise, suggestion] }
+        severity: { type: string, enum: [low, normal, high, urgent] }
+        subject: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 4000 }
+        source: { type: string, enum: [manual, phone, online, h5, mini_program, his, letter], nullable: true }
+        responsibleOrgId: { type: string, format: uuid, nullable: true }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true, description: "未指定时按严重程度套用默认 SLA" }
+    ComplaintAssignRequest:
+      type: object
+      required: [assigneeId]
+      properties:
+        assigneeId: { type: string, format: uuid }
+        responsibleOrgId: { type: string, format: uuid, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true }
+    ComplaintActionCreateRequest:
+      type: object
+      required: [actionType, content]
+      properties:
+        actionType:
+          type: string
+          enum: [CONTACT, INVESTIGATE, REPLY, NOTE, RECTIFY, FEEDBACK, ESCALATE, REVIEW, OTHER]
+        content: { type: string, maxLength: 2000 }
+    ComplaintRectificationCreateRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, maxLength: 2000 }
+        responsibleOrgId: { type: string, format: uuid, nullable: true }
+        dueAt: { type: string, format: date-time, nullable: true }
+    ComplaintFeedbackCreateRequest:
+      type: object
+      required: [rating, satisfied]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        satisfied: { type: boolean }
+        comment: { type: string, maxLength: 1000, nullable: true }
+        channel: { type: string, enum: [manual, phone, online, h5, mini_program], nullable: true }
+    ComplaintReviewRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [PASS, REJECT] }
+        comment: { type: string, maxLength: 1000, nullable: true }
+    ComplaintReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, maxLength: 500 }
+    ComplaintScanResult:
+      type: object
+      properties:
+        escalated: { type: integer, description: "本次扫描升级的工单数" }
 

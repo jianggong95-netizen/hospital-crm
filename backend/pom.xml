@@ -32,6 +32,7 @@
     <module>crm-order</module>
     <module>crm-member</module>
     <module>crm-followup</module>
+    <module>crm-complaint</module>
     <module>crm-boot</module>
   </modules>
 

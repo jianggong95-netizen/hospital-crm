@@ -76,6 +76,12 @@ const router = createRouter({
           meta: { title: '随访中心', permission: 'crm:followup:read' }
         },
         {
+          path: 'complaints',
+          name: 'complaints',
+          component: () => import('@/views/complaint/ComplaintView.vue'),
+          meta: { title: '投诉表扬', permission: 'crm:complaint:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),
