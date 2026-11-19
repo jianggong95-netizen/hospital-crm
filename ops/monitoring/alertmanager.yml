@@ -1,0 +1,47 @@
+# Hospital CRM Alertmanager configuration (CRM-020)
+#
+# Placeholders MUST be replaced by the hospital operations team:
+#   - webhook URL
+#   - SMTP smarthost / addresses
+#
+# Validate after editing:
+#   amtool check-config ops/monitoring/alertmanager.yml
+# Reload (Prometheus/Alertmanager containers):
+#   curl -X POST http://127.0.0.1:9093/-/reload
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: crm-ops-default
+  group_by: ["alertname", "severity", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: crm-ops-critical
+      group_wait: 10s
+      repeat_interval: 1h
+
+receivers:
+  - name: crm-ops-default
+    webhook_configs:
+      # Replace with the hospital monitoring webhook / bot / ticket system.
+      # Do not point this at /api/v1/ops/alerts/raise: the Alertmanager webhook
+      # payload is not the OPS alert request schema.
+      - url: "http://monitoring-webhook.example-hospital.local/alertmanager"
+        send_resolved: true
+
+  - name: crm-ops-critical
+    email_configs:
+      # Replace smarthost, from and to with hospital values.
+      - to: "crm-ops@example-hospital.local"
+        from: "alertmanager@example-hospital.local"
+        smarthost: "smtp.example-hospital.local:25"
+        require_tls: false
+        send_resolved: true
+    webhook_configs:
+      - url: "http://monitoring-webhook.example-hospital.local/alertmanager-critical"
+        send_resolved: true

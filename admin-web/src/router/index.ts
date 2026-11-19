@@ -112,6 +112,12 @@ const router = createRouter({
           meta: { title: '运营分析', permission: 'crm:analytics:read' }
         },
         {
+          path: 'ops',
+          name: 'ops',
+          component: () => import('@/views/ops/OpsView.vue'),
+          meta: { title: '运维监控', permission: 'crm:ops:read' }
+        },
+        {
           path: 'patient360',
           name: 'patient360',
           component: () => import('@/views/patients/Patient360View.vue'),

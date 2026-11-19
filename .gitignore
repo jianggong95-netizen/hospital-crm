@@ -36,6 +36,7 @@ logs/
 *.log
 uploads/
 tmp/
+backups/
 
 # ===== 系统 =====
 .DS_Store

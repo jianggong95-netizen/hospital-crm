@@ -27,6 +27,8 @@ tags:
   - name: 商保中心
   - name: 呼叫中心与短信
   - name: Analytics
+  - name: Ops
+    description: 系统集成、上线与运维：服务总览、定时任务监控、告警规则与告警处置、备份记录与恢复演练结果登记
 paths:
   /customers:
     get:
@@ -7617,6 +7619,267 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /ops/overview:
+    get:
+      tags: [Ops]
+      operationId: getOpsOverview
+      summary: 运维总览
+      description: |
+        返回应用名称/版本/运行环境、启动时间与运行时长、数据库连通性、接口错误统计、定时任务健康度、
+        最近一次备份与恢复演练状态、未关闭告警计数及外部集成能力开关；generatedAt 为本次快照生成时间。
+        需要 crm:ops:read 权限，接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsOverview" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/jobs:
+    get:
+      tags: [Ops]
+      operationId: getOpsJobs
+      summary: 查询定时任务状态
+      description: |
+        返回全部已注册定时任务的期望执行周期、最近执行状态与连续失败次数；
+        stale=true 表示最近执行时间超过期望周期仍未更新，neverRun=true 表示进程启动后尚未执行。
+        需要 crm:ops:read 权限，接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OpsJobStatus" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/jobs/{jobCode}/runs:
+    get:
+      tags: [Ops]
+      operationId: getOpsJobRuns
+      summary: 查询任务执行记录
+      description: |
+        返回指定定时任务最近的执行记录，按 startedAt 倒序；limit 默认 20、上限 100。
+        任务编码不存在返回 404。需要 crm:ops:read 权限，接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      parameters:
+        - in: path
+          name: jobCode
+          required: true
+          schema: { type: string, maxLength: 64 }
+          description: 定时任务编码
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+          description: 返回记录条数，默认 20，上限 100
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OpsJobRun" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /ops/alerts:
+    get:
+      tags: [Ops]
+      operationId: getOpsAlerts
+      summary: 分页查询告警
+      description: |
+        按处理状态分页查询告警记录，status 支持 OPEN/ACKED/RESOLVED，默认返回全部状态；
+        page 默认 1、pageSize 默认 20、pageSize 上限 100。需要 crm:ops:read 权限，
+        接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [OPEN, ACKED, RESOLVED] }
+          description: 告警状态
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsAlertPage" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/alerts/{alertId}/ack:
+    post:
+      tags: [Ops]
+      operationId: ackOpsAlert
+      summary: 确认告警
+      description: |
+        将 OPEN 状态告警确认（ACKED），记录确认人与确认时间；仅允许 OPEN→ACKED，
+        已解决或已确认的告警返回业务错误。动作写入 OPS_ALERT_ACK 审计。
+        需要 crm:ops:manage 权限，无请求体。
+      x-required-permission: crm:ops:manage
+      parameters:
+        - in: path
+          name: alertId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 确认成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsAlert" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/BusinessRuleFailed" }
+  /ops/alerts/raise:
+    post:
+      tags: [Ops]
+      operationId: raiseOpsAlert
+      summary: 外部告警接入
+      description: |
+        供日志扫描脚本、外部探针等上报告警；同 dedupKey 且处于 OPEN/ACKED 状态的告警
+        累加 occurrences 并刷新 lastSeenAt，不新增记录。source 未提供时默认 EXTERNAL。
+        动作写入 OPS_ALERT_RAISE 审计。需要 crm:ops:manage 权限。
+      x-required-permission: crm:ops:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpsAlertRaiseRequest" }
+      responses:
+        "200":
+          description: 已受理
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsAlert" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/alerts/rules:
+    get:
+      tags: [Ops]
+      operationId: getOpsAlertRules
+      summary: 查询告警规则清单
+      description: |
+        返回已注册告警规则，包括规则编码、严重级别、触发条件、阈值、统计窗口与启用状态。
+        需要 crm:ops:read 权限，接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/OpsAlertRule" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /ops/backups:
+    get:
+      tags: [Ops]
+      operationId: getOpsBackups
+      summary: 分页查询备份记录
+      description: |
+        按备份状态分页查询备份上报记录，status 支持 SUCCESS/FAILED，未提供时返回全部；
+        page 默认 1、pageSize 默认 20、pageSize 上限 100。需要 crm:ops:read 权限，
+        接口为只读查询，不写入审计。
+      x-required-permission: crm:ops:read
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [SUCCESS, FAILED] }
+          description: 备份状态
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsBackupPage" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Ops]
+      operationId: reportOpsBackup
+      summary: 上报备份结果
+      description: |
+        由备份脚本上报备份结果；backupCode 全局唯一，重复返回 409；finishedAt 不得早于 startedAt，
+        否则返回 400。动作写入 OPS_BACKUP_REPORT 审计。需要 crm:ops:manage 权限。
+      x-required-permission: crm:ops:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpsBackupReportRequest" }
+      responses:
+        "200":
+          description: 上报成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsBackup" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /ops/backups/{backupId}/verify:
+    post:
+      tags: [Ops]
+      operationId: verifyOpsBackup
+      summary: 回填恢复演练结果
+      description: |
+        回填指定备份的恢复演练结论与说明，仅更新 restoreVerified/restoreVerifiedAt/restoreMessage。
+        动作写入 OPS_BACKUP_VERIFY 审计。需要 crm:ops:manage 权限。
+      x-required-permission: crm:ops:manage
+      parameters:
+        - in: path
+          name: backupId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OpsBackupVerifyRequest" }
+      responses:
+        "200":
+          description: 回填成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/OpsBackup" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -10737,4 +11000,189 @@ components:
       required: [reason]
       properties:
         reason: { type: string, maxLength: 500, description: 驳回理由，必填 }
+    OpsOverview:
+      type: object
+      description: 运维总览快照，用于值班巡检与上线验收；时间字段均为服务端时间。
+      properties:
+        appName: { type: string, description: 应用名称 }
+        appVersion: { type: string, description: 构建版本号 }
+        profile: { type: string, description: 运行环境标识，如 prod、staging }
+        startedAt: { type: string, format: date-time, description: 进程启动时间 }
+        uptimeSeconds: { type: integer, format: int64, description: 已运行秒数 }
+        database: { $ref: "#/components/schemas/OpsDatabaseStatus" }
+        api: { $ref: "#/components/schemas/OpsApiSummary" }
+        jobs: { $ref: "#/components/schemas/OpsJobSummary" }
+        backups: { $ref: "#/components/schemas/OpsBackupSummary" }
+        alerts: { $ref: "#/components/schemas/OpsAlertSummary" }
+        capabilities: { $ref: "#/components/schemas/OpsCapabilities" }
+        generatedAt: { type: string, format: date-time, description: 快照生成时间 }
+    OpsDatabaseStatus:
+      type: object
+      description: 数据库连通性探测结果。
+      properties:
+        status: { type: string, enum: [UP, DOWN], description: 探测结果 }
+        roundTripMs: { type: integer, description: 探测往返耗时（毫秒） }
+    OpsApiSummary:
+      type: object
+      description: 接口调用统计汇总。
+      properties:
+        windowMinutes: { type: integer, description: 统计窗口（分钟） }
+        requestCount: { type: integer, format: int64, description: 请求总数 }
+        errorCount: { type: integer, format: int64, description: 错误响应数 }
+        errorRate: { type: number, format: double, minimum: 0, maximum: 1, description: 错误率，取值 0~1 }
+        avgLatencyMs: { type: number, format: double, description: 平均响应耗时（毫秒） }
+        maxLatencyMs: { type: integer, format: int64, description: 最大响应耗时（毫秒） }
+    OpsJobSummary:
+      type: object
+      description: 定时任务健康度汇总。
+      properties:
+        total: { type: integer, description: 已注册任务数 }
+        stale: { type: integer, description: 超过期望周期未更新的任务数 }
+        failing: { type: integer, description: 连续失败的任务数 }
+    OpsBackupSummary:
+      type: object
+      description: 最近一次成功备份与恢复演练状态。
+      properties:
+        lastSuccessAt: { type: string, format: date-time, nullable: true, description: 最近一次成功备份完成时间 }
+        lastBackupCode: { type: string, nullable: true, description: 最近一次成功备份编码 }
+        lastStatus: { type: string, nullable: true, description: 最近一次备份上报状态 }
+        ageHours: { type: number, format: double, nullable: true, description: 距最近一次成功备份的小时数 }
+        restoreVerified: { type: boolean, description: 最近一次成功备份是否已通过恢复演练验证 }
+        lastVerifiedAt: { type: string, format: date-time, nullable: true, description: 最近一次演练验证时间 }
+    OpsAlertSummary:
+      type: object
+      description: 未解决告警计数。
+      properties:
+        open: { type: integer, description: OPEN 状态数量 }
+        critical: { type: integer, description: CRITICAL 级别未解决数量 }
+        high: { type: integer, description: HIGH 级别未解决数量 }
+        medium: { type: integer, description: MEDIUM 级别未解决数量 }
+    OpsCapabilities:
+      type: object
+      description: 外部集成能力开关。
+      properties:
+        hisEnabled: { type: boolean, description: HIS 对接是否启用 }
+        callCenterEnabled: { type: boolean, description: 呼叫中心是否启用 }
+        smsProvider: { type: string, description: 短信通道标识 }
+    OpsJobStatus:
+      type: object
+      description: 定时任务运行状态视图。
+      properties:
+        jobCode: { type: string, description: 任务编码 }
+        jobName: { type: string, description: 任务名称 }
+        expectedIntervalSeconds: { type: integer, description: 期望执行周期（秒） }
+        lastRunAt: { type: string, format: date-time, nullable: true, description: 最近一次执行开始时间 }
+        lastStatus: { type: string, enum: [SUCCESS, FAILED], nullable: true, description: 最近一次执行状态 }
+        lastDurationMs: { type: integer, format: int64, nullable: true, description: 最近一次执行耗时（毫秒） }
+        lastMessage: { type: string, nullable: true, description: 最近一次执行摘要或错误信息 }
+        consecutiveFailures: { type: integer, description: 连续失败次数 }
+        stale: { type: boolean, description: 最近执行时间超过期望周期仍未更新 }
+        neverRun: { type: boolean, description: 进程启动后尚未执行 }
+    OpsJobRun:
+      type: object
+      description: 定时任务单次执行记录。
+      properties:
+        id: { type: string, format: uuid }
+        jobCode: { type: string }
+        status: { type: string, enum: [SUCCESS, FAILED] }
+        startedAt: { type: string, format: date-time, description: 开始时间 }
+        finishedAt: { type: string, format: date-time, description: 结束时间 }
+        durationMs: { type: integer, format: int64, description: 执行耗时（毫秒） }
+        message: { type: string, nullable: true, description: 执行摘要或错误信息 }
+    OpsAlert:
+      type: object
+      description: 告警视图；同 dedupKey 且未解决的告警合并为一条并累加 occurrences。
+      properties:
+        id: { type: string, format: uuid }
+        alertCode: { type: string, description: 告警规则编码 }
+        severity: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        status: { type: string, enum: [OPEN, ACKED, RESOLVED] }
+        title: { type: string }
+        detail: { type: string, nullable: true }
+        dedupKey: { type: string, description: 去重键 }
+        source: { type: string, description: 告警来源，如 INTERNAL、EXTERNAL }
+        firstSeenAt: { type: string, format: date-time, description: 首次出现时间 }
+        lastSeenAt: { type: string, format: date-time, description: 最近出现时间 }
+        occurrences: { type: integer, description: 累计出现次数 }
+        ackedBy: { type: string, format: uuid, nullable: true, description: 确认人用户 ID }
+        ackedByName: { type: string, nullable: true, description: 确认人姓名 }
+        ackedAt: { type: string, format: date-time, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    OpsAlertRule:
+      type: object
+      description: 告警规则清单项，用于说明告警触发口径。
+      properties:
+        alertCode: { type: string }
+        name: { type: string }
+        severity: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        condition: { type: string, description: 触发条件说明 }
+        threshold: { type: number, nullable: true, description: 阈值 }
+        windowSeconds: { type: integer, nullable: true, description: 统计窗口（秒） }
+        enabled: { type: boolean }
+    OpsBackup:
+      type: object
+      description: 备份上报与恢复演练记录视图。
+      properties:
+        id: { type: string, format: uuid }
+        backupCode: { type: string }
+        backupType: { type: string, enum: [FULL, WAL, OBJECT] }
+        status: { type: string, enum: [SUCCESS, FAILED] }
+        sizeBytes: { type: integer, format: int64, description: 备份文件大小（字节） }
+        fileHash: { type: string, nullable: true, description: SHA-256 摘要（64 位十六进制） }
+        target: { type: string, nullable: true, description: 备份存储目标 }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        durationSeconds: { type: integer, format: int64, nullable: true, description: 备份耗时（秒） }
+        message: { type: string, nullable: true }
+        reportedBy: { type: string, description: 上报来源或上报人 }
+        restoreVerified: { type: boolean, description: 恢复演练是否通过 }
+        restoreVerifiedAt: { type: string, format: date-time, nullable: true }
+        restoreMessage: { type: string, nullable: true, description: 恢复演练说明 }
+        createdAt: { type: string, format: date-time }
+    OpsAlertRaiseRequest:
+      type: object
+      required: [alertCode, severity, title]
+      properties:
+        alertCode: { type: string, maxLength: 64, description: 告警规则编码 }
+        severity: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+        title: { type: string, maxLength: 200 }
+        detail: { type: string, description: 告警详情 }
+        dedupKey: { type: string, maxLength: 160, description: 去重键；同 dedupKey 且处于 OPEN/ACKED 时累加次数 }
+        source: { type: string, maxLength: 32, default: EXTERNAL, description: 告警来源，默认 EXTERNAL }
+    OpsBackupReportRequest:
+      type: object
+      required: [backupCode, backupType, status, sizeBytes, startedAt, finishedAt]
+      properties:
+        backupCode: { type: string, maxLength: 80, description: 备份编码，全局唯一，重复返回 409 }
+        backupType: { type: string, enum: [FULL, WAL, OBJECT] }
+        status: { type: string, enum: [SUCCESS, FAILED] }
+        sizeBytes: { type: integer, format: int64, minimum: 0, description: 备份文件大小（字节） }
+        fileHash: { type: string, pattern: "^[0-9a-fA-F]{64}$", description: SHA-256 摘要，64 位十六进制 }
+        target: { type: string, maxLength: 120, description: 备份存储目标 }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, description: 完成时间，须不早于 startedAt }
+        message: { type: string, maxLength: 500 }
+    OpsBackupVerifyRequest:
+      type: object
+      required: [restoreVerified]
+      properties:
+        restoreVerified: { type: boolean, description: 恢复演练是否通过 }
+        message: { type: string, maxLength: 500, description: 演练说明 }
+    OpsAlertPage:
+      type: object
+      description: 告警分页结果。
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/OpsAlert" } }
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        pageSize: { type: integer }
+    OpsBackupPage:
+      type: object
+      description: 备份记录分页结果。
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/OpsBackup" } }
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        pageSize: { type: integer }
 

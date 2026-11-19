@@ -1,0 +1,56 @@
+# Hospital CRM Prometheus configuration (CRM-020)
+#
+# Used by the optional "ops" compose profile:
+#   docker compose --profile ops up -d prometheus alertmanager grafana
+#
+# The crm-api target is the compose service name. When Prometheus runs outside
+# compose, replace crm-api:8080 with the real host:port.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    service: hospital-crm
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+scrape_configs:
+  - job_name: crm-api
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    # /actuator/prometheus 默认需要认证：
+    #   方式一（内网且已由反向代理限制来源）：应用设置 CRM_OPS_METRICS_PUBLIC=true
+    #   方式二（推荐）：取消下面两行注释，并把具备 crm:ops:read 的长期令牌写入挂载文件
+    # authorization:
+    #   type: Bearer
+    #   credentials_file: /etc/prometheus/crm-token
+    static_configs:
+      - targets:
+          - crm-api:8080
+
+  # Optional readiness probe with blackbox_exporter. The CrmReadinessDown rule
+  # expects this job. If blackbox_exporter is not deployed, leave it commented:
+  # CrmApiDown still covers a fully unreachable instance.
+  #
+  # - job_name: crm-api-readiness
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #         - http://crm-api:8080/actuator/health/readiness
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115

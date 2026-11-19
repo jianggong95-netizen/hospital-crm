@@ -1,0 +1,93 @@
+# Hospital CRM Prometheus alert rules (CRM-020)
+#
+# Metric sources:
+#   - up{job="crm-api"}                                  Prometheus built-in
+#   - crm_api_requests_total{module,status}              CRM API custom counter
+#   - crm_api_request_duration_seconds{module}           CRM API custom histogram
+#   - crm_job_last_success_timestamp_seconds             CRM custom gauge (planned)
+#   - crm_backup_last_success_timestamp_seconds          CRM custom gauge (planned)
+#
+# The two "planned" gauges must be exported by the CRM-020 backend before the
+# corresponding rules can fire. Until then, use the in-application alert center
+# (POST /api/v1/ops/alerts/raise, rules visible at GET /api/v1/ops/alerts/rules)
+# as the source of truth for job stagnation and backup staleness.
+
+groups:
+  - name: crm-api-alerts
+    rules:
+      - alert: CrmApiDown
+        expr: up{job="crm-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: hospital-crm
+        annotations:
+          summary: "CRM API scrape target is down"
+          description: "Prometheus cannot scrape {{ $labels.instance }} for more than 1 minute. Check the java process, port 8080 and the container health."
+
+      - alert: CrmReadinessDown
+        expr: probe_success{job="crm-api-readiness"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: hospital-crm
+        annotations:
+          summary: "CRM API readiness probe failed"
+          description: "The readiness endpoint /actuator/health/readiness did not return UP for 2 minutes. This rule requires the optional blackbox_exporter job in prometheus.yml; without it CrmApiDown is the fallback."
+
+      - alert: CrmApi5xxRateHigh
+        expr: |
+          (
+            sum(rate(crm_api_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(crm_api_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: high
+          service: hospital-crm
+        annotations:
+          summary: "CRM API 5xx ratio above 5%"
+          description: "5xx responses account for more than 5% of requests over the last 5 minutes. Inspect crm-api-error.log and the ops alert center."
+
+      - alert: CrmApiLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, module) (rate(crm_api_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: medium
+          service: hospital-crm
+        annotations:
+          summary: "CRM API P95 latency above 2s"
+          description: "P95 request latency for {{ $labels.module }} has been above 2 seconds for 10 minutes. Check database load, HIS latency and JVM GC."
+          # If the backend exports a summary instead of a histogram, use:
+          # crm_api_request_duration_seconds{quantile="0.95"} > 2
+
+      - alert: CrmJobStale
+        expr: time() - crm_job_last_success_timestamp_seconds > 3600
+        for: 5m
+        labels:
+          severity: high
+          service: hospital-crm
+        annotations:
+          summary: "CRM scheduled job has not succeeded for 1 hour"
+          description: "Job {{ $labels.job }} last success is older than 3600 seconds. If the gauge is not yet exported by the application, the in-application JOB_STALE rule is the authoritative alert."
+          # Metric must be exported by CRM-020 (gauge of last success epoch seconds,
+          # labelled by job). Verify with:
+          #   curl -s http://127.0.0.1:8080/actuator/prometheus | grep crm_job_last_success
+
+      - alert: CrmBackupStale
+        expr: time() - crm_backup_last_success_timestamp_seconds > 129600
+        for: 10m
+        labels:
+          severity: high
+          service: hospital-crm
+        annotations:
+          summary: "CRM database backup is older than 36 hours"
+          description: "Last successful backup is older than 36 hours. Check ops/pg/backup logs and the backup directory. If the gauge is not exported, the in-application BACKUP_STALE rule is the authoritative alert."
+          # Metric must be exported by CRM-020 (last successful backup epoch seconds).
+          # Verify with:
+          #   curl -s http://127.0.0.1:8080/actuator/prometheus | grep crm_backup_last_success

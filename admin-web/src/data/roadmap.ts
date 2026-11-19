@@ -80,9 +80,9 @@ export const phases: Phase[] = [
     key: 'P6',
     name: '联调上线',
     focus: '系统集成、安全测试、备份恢复演练、灰度上线',
-    status: 'planned',
+    status: 'done',
     tasks: [
-      'CRM-020 系统集成、上线与运维'
+      'CRM-020 系统集成、上线与运维（已完成）'
     ]
   }
 ]

@@ -38,6 +38,7 @@
     <module>crm-callcenter</module>
     <module>crm-insurance</module>
     <module>crm-analytics</module>
+    <module>crm-ops</module>
     <module>crm-boot</module>
   </modules>
 

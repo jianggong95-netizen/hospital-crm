@@ -115,6 +115,23 @@ crm:
     provider: ${CRM_CALLCENTER_PROVIDER:}
   sms:
     provider: ${CRM_SMS_PROVIDER:simulated}
+  ops:
+    job-retention-days: ${CRM_OPS_JOB_RETENTION_DAYS:30}
+    metrics:
+      # 设为 true 时允许 Prometheus 匿名抓取 /actuator/prometheus，生产必须由反向代理限制来源
+      endpoint-public: ${CRM_OPS_METRICS_PUBLIC:false}
+    alerts:
+      enabled: ${CRM_OPS_ALERTS_ENABLED:true}
+      initial-delay-ms: ${CRM_OPS_ALERT_INITIAL_DELAY_MS:30000}
+      evaluation-interval-ms: ${CRM_OPS_ALERT_EVALUATION_INTERVAL_MS:60000}
+      backup-max-age-hours: ${CRM_OPS_BACKUP_MAX_AGE_HOURS:24}
+      job-stale-multiplier: ${CRM_OPS_JOB_STALE_MULTIPLIER:3}
+      job-failure-threshold: ${CRM_OPS_JOB_FAILURE_THRESHOLD:3}
+      api-window-seconds: ${CRM_OPS_API_WINDOW_SECONDS:300}
+      api-min-samples: ${CRM_OPS_API_MIN_SAMPLES:20}
+      api-error-rate-threshold: ${CRM_OPS_API_ERROR_RATE_THRESHOLD:0.05}
+      api-latency-threshold-ms: ${CRM_OPS_API_LATENCY_THRESHOLD_MS:2000}
+      auth-failure-threshold: ${CRM_OPS_AUTH_FAILURE_THRESHOLD:20}
   patient360:
     cache-ttl-seconds: ${CRM_PATIENT360_CACHE_TTL_SECONDS:60}
     cache-max-entries: ${CRM_PATIENT360_CACHE_MAX_ENTRIES:500}
