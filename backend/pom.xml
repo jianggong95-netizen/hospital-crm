@@ -49,6 +49,11 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <springdoc.version>2.8.17</springdoc.version>
     <jjwt.version>0.12.7</jjwt.version>
+    <!-- 发布版本：默认跟随开发态；build-release.ps1 用 -Dcrm.release.version=x.y.z 覆盖，
+         经 application.yml 的 @crm.release.version@ 资源过滤注入 jar 自报版本，无需 versions 插件 -->
+    <crm.release.version>1.0.0-SNAPSHOT</crm.release.version>
+    <!-- 构建时间戳格式，供 application.yml 的 @maven.build.timestamp@ 资源过滤使用 -->
+    <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss</maven.build.timestamp.format>
   </properties>
 
   <dependencyManagement>

@@ -86,10 +86,11 @@ info:
   app:
     name: Hospital CRM API
     version: ${crm.version}
+    build-time: @maven.build.timestamp@
     description: 医院智慧客户服务与运营管理平台
 
 crm:
-  version: 1.0.0-SNAPSHOT
+  version: @crm.release.version@
   cors:
     allowed-origins: ${CRM_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174}
   security:

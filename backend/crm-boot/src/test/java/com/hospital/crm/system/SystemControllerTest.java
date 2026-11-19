@@ -30,7 +30,8 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.application").value("hospital-crm"))
-                .andExpect(jsonPath("$.data.version").value("1.0.0-SNAPSHOT"))
+                // 版本号由构建注入（-Dcrm.release.version），测试只校验格式而非具体值
+                .andExpect(jsonPath("$.data.version").value(org.hamcrest.Matchers.matchesPattern("\\d+\\.\\d+\\.\\d+(-SNAPSHOT)?")))
                 .andExpect(jsonPath("$.data.profiles[0]").value("dev"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
                 .andExpect(jsonPath("$.timestamp").isNotEmpty());

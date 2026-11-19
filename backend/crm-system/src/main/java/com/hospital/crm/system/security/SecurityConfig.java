@@ -46,7 +46,9 @@ public class SecurityConfig {
                             .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                             .requestMatchers(HttpMethod.POST, "/api/v1/payment-callbacks/**").permitAll()
                             .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                            .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
+                            .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                            // 单进程部署：匿名 GET 前端静态资源与 SPA history 路由；/api、/actuator、/v3、/swagger-ui、/error 不受影响
+                            .requestMatchers(new SpaPublicRequestMatcher()).permitAll();
                     // Prometheus 采集：默认需要认证；仅当显式开启并已由反向代理限制来源时方可匿名抓取
                     if (metricsEndpointPublic) {
                         authorize.requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll();

@@ -195,4 +195,46 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!--
+      单进程部署：当 admin-web 已执行 `npm run build` 产出 dist 时，自动把前端静态资源
+      打入 jar 的 BOOT-INF/classes/static/，由 Spring Boot 直接托管页面 + API + Swagger。
+      dist 不存在时（纯后端开发/CI 单测）该 profile 不激活，构建与测试不受影响。
+    -->
+    <profile>
+      <id>with-web</id>
+      <activation>
+        <file>
+          <exists>../../admin-web/dist/index.html</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-admin-web-dist</id>
+                <phase>process-resources</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>../../admin-web/dist</directory>
+                      <filtering>false</filtering>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

@@ -37,6 +37,10 @@ logs/
 uploads/
 tmp/
 backups/
+demo-runtime/
+
+# ===== 安装包构建产物 =====
+installer/generated.iss
 
 # ===== 系统 =====
 .DS_Store
