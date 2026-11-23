@@ -8,6 +8,96 @@
         "navigationBarTextStyle": "white",
         "backgroundColor": "#F4F7FB"
       }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/patient/select",
+      "style": {
+        "navigationBarTitleText": "选择就诊人",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/appointment/appointment",
+      "style": {
+        "navigationBarTitleText": "预约挂号",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/escort/escort",
+      "style": {
+        "navigationBarTitleText": "陪诊服务",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/family/family",
+      "style": {
+        "navigationBarTitleText": "我的家庭",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/chat/list",
+      "style": {
+        "navigationBarTitleText": "在线客服",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/chat/detail",
+      "style": {
+        "navigationBarTitleText": "咨询会话",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/homevisit/apply",
+      "style": {
+        "navigationBarTitleText": "上门服务",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/homevisit/doctor",
+      "style": {
+        "navigationBarTitleText": "医生工作台",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
+    },
+    {
+      "path": "pages/homevisit/doctor-detail",
+      "style": {
+        "navigationBarTitleText": "上门服务任务",
+        "navigationBarBackgroundColor": "#2D6DAD",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F4F7FB"
+      }
     }
   ],
   "globalStyle": {

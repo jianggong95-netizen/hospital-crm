@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navItems } from '@/router/nav'
+import { navTopItems, navGroups } from '@/router/nav'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -9,9 +9,34 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const pageTitle = computed(() => (route.meta.title as string) || '工作台')
-const menuItems = computed(() => navItems.filter((item) => auth.has(item.permission)))
+const visibleTopItems = computed(() => navTopItems.filter((item) => auth.has(item.permission)))
+const visibleGroups = computed(() =>
+  navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => auth.has(item.permission)) }))
+    .filter((group) => group.items.length > 0)
+)
 const user = computed(() => auth.user)
 const roleText = computed(() => user.value?.roles.join(' · ') || '未分配角色')
+
+const expanded = reactive<Record<string, boolean>>({})
+
+function toggleGroup(key: string) {
+  expanded[key] = !expanded[key]
+}
+
+function groupHasActive(group: { items: { path: string }[] }) {
+  return group.items.some((item) => route.path === item.path)
+}
+
+// 进入某页面时自动展开其所属分组
+watch(
+  () => route.path,
+  (path) => {
+    const active = navGroups.find((g) => g.items.some((i) => i.path === path))
+    if (active) expanded[active.key] = true
+  },
+  { immediate: true }
+)
 
 async function handleLogout() {
   await auth.logout()
@@ -36,7 +61,7 @@ async function handleLogout() {
 
       <nav class="nav">
         <RouterLink
-          v-for="item in menuItems"
+          v-for="item in visibleTopItems"
           :key="item.path"
           :to="item.path"
           class="nav-item"
@@ -45,6 +70,38 @@ async function handleLogout() {
           <span class="nav-icon" :style="{ background: item.tint }">{{ item.short }}</span>
           <span class="nav-label">{{ item.label }}</span>
         </RouterLink>
+
+        <div v-for="group in visibleGroups" :key="group.key" class="nav-group">
+          <button
+            type="button"
+            class="group-header"
+            :class="{ 'has-active': groupHasActive(group) }"
+            @click="toggleGroup(group.key)"
+          >
+            <span class="group-label">{{ group.label }}</span>
+            <span class="group-count">{{ group.items.length }}</span>
+            <span class="group-arrow" :class="{ open: expanded[group.key] }">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M5 3l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </button>
+
+          <el-collapse-transition>
+            <div v-show="expanded[group.key]" class="group-items">
+              <RouterLink
+                v-for="item in group.items"
+                :key="item.path"
+                :to="item.path"
+                class="nav-item"
+                :class="{ active: route.path === item.path }"
+              >
+                <span class="nav-icon" :style="{ background: item.tint }">{{ item.short }}</span>
+                <span class="nav-label">{{ item.label }}</span>
+              </RouterLink>
+            </div>
+          </el-collapse-transition>
+        </div>
       </nav>
 
       <div class="sidebar-foot">
@@ -96,15 +153,18 @@ async function handleLogout() {
 <style scoped lang="scss">
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   width: 252px;
+  height: 100vh;
   flex-shrink: 0;
   padding: 26px 18px;
+  overflow-y: auto;
   background: linear-gradient(180deg, #1c4a7e 0%, #163a63 100%);
   color: #eaf2fb;
 }
@@ -152,8 +212,85 @@ async function handleLogout() {
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   margin-top: 24px;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(234, 242, 251, 0.55);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.group-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 242, 251, 0.85);
+}
+
+.group-header.has-active {
+  color: #fff;
+}
+
+.group-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.group-count {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(234, 242, 251, 0.7);
+  font-size: 11px;
+  text-align: center;
+}
+
+.group-header.has-active .group-count {
+  background: rgba(95, 162, 230, 0.35);
+  color: #fff;
+}
+
+.group-arrow {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.group-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
+.group-arrow.open {
+  transform: rotate(90deg);
+}
+
+.group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  margin-left: 10px;
+  overflow: hidden;
 }
 
 .nav-item {
@@ -231,6 +368,8 @@ async function handleLogout() {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .topbar {
@@ -238,6 +377,7 @@ async function handleLogout() {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  flex-shrink: 0;
   padding: 26px 36px 18px;
 }
 
@@ -307,10 +447,13 @@ async function handleLogout() {
 
 .content {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 8px 36px 28px;
 }
 
 .footer {
+  flex-shrink: 0;
   padding: 0 36px 24px;
   color: var(--crm-muted);
   font-size: 12px;
@@ -319,10 +462,14 @@ async function handleLogout() {
 @media (max-width: 900px) {
   .app-shell {
     flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
 
   .sidebar {
     width: 100%;
+    height: auto;
+    overflow: visible;
     padding: 16px 18px;
   }
 
@@ -331,9 +478,17 @@ async function handleLogout() {
   }
 
   .nav {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .group-items {
     flex-direction: row;
     flex-wrap: wrap;
-    margin-top: 14px;
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
   }
 
   .nav-item {
@@ -349,7 +504,13 @@ async function handleLogout() {
     padding: 20px 20px 12px;
   }
 
+  .main {
+    height: auto;
+    overflow: visible;
+  }
+
   .content {
+    overflow: visible;
     padding: 4px 20px 24px;
   }
 

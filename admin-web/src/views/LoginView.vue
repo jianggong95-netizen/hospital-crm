@@ -105,7 +105,7 @@ async function submit() {
         </el-form>
 
         <p v-if="isDev" class="dev-hint">
-          开发环境初始管理员：<code>admin / Crm@123456</code>（生产部署必须通过环境变量覆盖）
+          开发环境初始管理员：<code>admin / 见 .env 的 CRM_BOOTSTRAP_ADMIN_PASSWORD</code>（生产部署必须通过环境变量覆盖）
         </p>
       </div>
     </section>
