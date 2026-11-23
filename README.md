@@ -1110,3 +1110,9 @@ npm run build:h5
 - `Hospital_CRM_V1_0_交付包/api/04-openapi.yaml`
 - `Hospital_CRM_V1_0_交付包/codex/05-Codex开发任务书.md`
 - `Hospital_CRM_V1_0_交付包/deploy/07-内网部署说明.md`
+
+## 许可证
+
+本项目基于 **GNU General Public License v3.0** 开源（见 [LICENSE](LICENSE)）。
+
+Copyright © 2026 jianggong95-netizen.
