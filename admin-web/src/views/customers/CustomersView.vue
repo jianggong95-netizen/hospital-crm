@@ -6,11 +6,14 @@ import {
   changeCustomerStatus,
   createCustomer,
   fetchCustomer,
+  fetchCustomerDuplicates,
   fetchCustomers,
+  mergeCustomers,
+  syncHisPatients,
   updateCustomer
 } from '@/api/customers'
 import { fetchTags } from '@/api/tags'
-import type { CustomerDetail, CustomerSummary, TagItem } from '@/types/customer'
+import type { CustomerDetail, CustomerDuplicateGroup, CustomerSummary, TagItem } from '@/types/customer'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -61,6 +64,13 @@ const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<CustomerDetail>()
 
+const syncingHis = ref(false)
+const duplicateVisible = ref(false)
+const duplicateLoading = ref(false)
+const duplicateGroups = ref<CustomerDuplicateGroup[]>([])
+const mergeTargets = ref<string[]>([])
+const mergingGroup = ref<number | null>(null)
+
 const formRules: FormRules = {
   name: [
     { required: true, message: '请输入姓名', trigger: 'blur' },
@@ -83,6 +93,14 @@ const formRules: FormRules = {
 
 function sourceLabel(code?: string) {
   return sourceOptions.find((item) => item.value === code)?.label ?? code ?? '—'
+}
+
+function statusLabel(status: string) {
+  return status === 'active' ? '启用' : status === 'merged' ? '已合并' : '停用'
+}
+
+function statusBadgeClass(status: string) {
+  return status === 'active' ? 'badge-success' : status === 'merged' ? 'badge-neutral' : 'badge-danger'
 }
 
 async function loadTags() {
@@ -247,6 +265,90 @@ function formatDate(value?: string) {
   return value ? value.slice(0, 10) : '—'
 }
 
+async function handleSyncHis() {
+  try {
+    await ElMessageBox.confirm(
+      '将从 HIS 拉取患者主索引并同步到 CRM：能对上号的自动绑定，对不上的新建建档；已同步过的会跳过。确认执行？',
+      '同步 HIS 患者',
+      { type: 'warning', confirmButtonText: '开始同步', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  syncingHis.value = true
+  try {
+    const result = await syncHisPatients()
+    ElMessage.success(
+      `同步完成：共 ${result.total} 人，新建 ${result.created}、关联 ${result.linked}、补齐 ${result.updated}、跳过 ${result.skipped}`
+    )
+    await load()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'HIS 患者同步失败')
+  } finally {
+    syncingHis.value = false
+  }
+}
+
+async function loadDuplicates() {
+  duplicateLoading.value = true
+  try {
+    duplicateGroups.value = await fetchCustomerDuplicates()
+    mergeTargets.value = duplicateGroups.value.map((group) => group.items[0]?.id ?? '')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '加载重复客户失败')
+  } finally {
+    duplicateLoading.value = false
+  }
+}
+
+function openDuplicates() {
+  duplicateVisible.value = true
+  loadDuplicates()
+}
+
+async function mergeGroup(index: number) {
+  const group = duplicateGroups.value[index]
+  const targetId = mergeTargets.value[index]
+  if (!group || !targetId) return
+  const targetItem = group.items.find((item) => item.id === targetId)
+  const sources = group.items.filter((item) => item.id !== targetId)
+  if (!sources.length) {
+    ElMessage.info('该组没有需要合并的其他档案')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将 ${sources.length} 个重复档案合并到 ${targetItem?.name ?? '目标客户'}（${targetItem?.customerNo ?? ''}）：` +
+        '业务数据整体迁移，被合并档案归档为“已合并”，操作不可撤销。',
+      '确认合并',
+      { type: 'warning', confirmButtonText: '确认合并', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  mergingGroup.value = index
+  try {
+    let movedRows = 0
+    let filledCount = 0
+    for (const item of sources) {
+      const result = await mergeCustomers(targetId, item.id)
+      movedRows += Object.values(result.mergedTables || {}).reduce((sum, count) => sum + count, 0)
+      filledCount += result.filledFields?.length ?? 0
+    }
+    ElMessage.success(
+      `合并完成：${sources.length} 个档案已并入，迁移业务数据 ${movedRows} 条` +
+        (filledCount ? `，补齐目标档案 ${filledCount} 项缺失字段` : '')
+    )
+    await loadDuplicates()
+    await load()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '合并失败')
+    await loadDuplicates()
+  } finally {
+    mergingGroup.value = null
+  }
+}
+
 onMounted(async () => {
   await loadTags()
   await load()
@@ -262,7 +364,11 @@ onMounted(async () => {
           客户档案台账；手机号与证件号加密存储，列表仅展示脱敏值，检索需精确匹配手机号或证件号。
         </p>
       </div>
-      <el-button v-if="canWrite" type="primary" @click="openCreate">新建客户</el-button>
+      <div class="section-actions">
+        <el-button v-if="canWrite" :loading="syncingHis" @click="handleSyncHis">从 HIS 同步患者</el-button>
+        <el-button v-if="canWrite" @click="openDuplicates">查重合并</el-button>
+        <el-button v-if="canWrite" type="primary" @click="openCreate">新建客户</el-button>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -314,9 +420,7 @@ onMounted(async () => {
       </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <span class="badge" :class="row.status === 'active' ? 'badge-success' : 'badge-danger'">
-            {{ row.status === 'active' ? '启用' : '停用' }}
-          </span>
+          <span class="badge" :class="statusBadgeClass(row.status)">{{ statusLabel(row.status) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="建档日期" width="120">
@@ -413,6 +517,63 @@ onMounted(async () => {
       </template>
     </el-dialog>
 
+    <el-dialog v-model="duplicateVisible" title="客户查重与合并" width="780px" top="6vh">
+      <div v-loading="duplicateLoading" class="dup-body">
+        <el-empty v-if="!duplicateLoading && !duplicateGroups.length" description="未发现重复建档的客户" />
+        <div v-for="(group, index) in duplicateGroups" :key="index" class="dup-group">
+          <div class="dup-group-head">
+            <el-tag size="small" type="warning" effect="plain">
+              {{ group.reason === 'phone' ? '手机号相同' : '姓名+生日相同' }}
+            </el-tag>
+            <span class="cell-muted">共 {{ group.items.length }} 个重复档案，单选保留目标后合并</span>
+            <el-button
+              type="primary"
+              size="small"
+              :loading="mergingGroup === index"
+              @click="mergeGroup(index)"
+            >
+              执行合并
+            </el-button>
+          </div>
+          <el-table :data="group.items" size="small" border>
+            <el-table-column label="保留" width="70" align="center">
+              <template #default="{ row }">
+                <el-radio
+                  :model-value="mergeTargets[index]"
+                  :value="row.id"
+                  @change="mergeTargets[index] = row.id"
+                >
+                  <span />
+                </el-radio>
+              </template>
+            </el-table-column>
+            <el-table-column prop="customerNo" label="客户号" width="120">
+              <template #default="{ row }">
+                <span class="cell-mono">{{ row.customerNo }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="姓名" min-width="90" />
+            <el-table-column label="手机号" width="130">
+              <template #default="{ row }">
+                <span class="cell-mono">{{ row.phoneMasked || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="出生日期" width="110">
+              <template #default="{ row }">{{ row.birthDate || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="建档日期" width="110">
+              <template #default="{ row }">
+                <span class="cell-muted">{{ formatDate(row.createdAt) }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="duplicateVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="detailVisible" title="客户档案" size="520px">
       <div v-loading="detailLoading">
         <template v-if="detail">
@@ -462,6 +623,32 @@ onMounted(async () => {
 </template>
 
 <style scoped lang="scss">
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dup-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.dup-group {
+  margin-bottom: 18px;
+}
+
+.dup-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.dup-group-head .el-button {
+  margin-left: auto;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;

@@ -31,8 +31,9 @@ public class FollowupConfigController {
     @GetMapping("/categories")
     @PreAuthorize("hasAuthority('crm:followup:read')")
     public ApiResponse<List<FollowupDtos.CategoryView>> listCategories(
-            @RequestParam(required = false) String status) {
-        return ApiResponse.ok(configService.listCategories(status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String visitType) {
+        return ApiResponse.ok(configService.listCategories(status, visitType));
     }
 
     @PostMapping("/categories")

@@ -71,7 +71,7 @@ class FollowupConfigServiceTest {
                 .thenReturn(Optional.of(category("active")));
 
         assertThatThrownBy(() -> service.createCategory(
-                new FollowupDtos.CategoryCreateRequest(CATEGORY_CODE, "出院随访", null, 10)))
+                new FollowupDtos.CategoryCreateRequest(CATEGORY_CODE, "出院随访", "INPATIENT", null, 10)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("分类编码已存在");
     }
@@ -81,7 +81,7 @@ class FollowupConfigServiceTest {
         when(categoryRepository.findByCategoryCode(CATEGORY_CODE)).thenReturn(Optional.empty());
 
         FollowupDtos.CategoryView view = service.createCategory(
-                new FollowupDtos.CategoryCreateRequest(CATEGORY_CODE, "出院随访", "说明", 10));
+                new FollowupDtos.CategoryCreateRequest(CATEGORY_CODE, "出院随访", "INPATIENT", "说明", 10));
 
         assertThat(view.categoryCode()).isEqualTo(CATEGORY_CODE);
         assertThat(view.status()).isEqualTo("active");

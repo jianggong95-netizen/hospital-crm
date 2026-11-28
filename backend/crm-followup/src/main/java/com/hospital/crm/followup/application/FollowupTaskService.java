@@ -16,6 +16,7 @@ import com.hospital.crm.followup.domain.FollowupTask;
 import com.hospital.crm.followup.domain.FollowupTaskRepository;
 import com.hospital.crm.followup.domain.FollowupTemplate;
 import com.hospital.crm.followup.domain.FollowupTemplateRepository;
+import com.hospital.crm.followup.support.FollowupVisitTypes;
 import com.hospital.crm.system.audit.AuditService;
 import com.hospital.crm.system.security.CurrentUser;
 import com.hospital.crm.system.user.SysUser;
@@ -29,6 +30,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -52,7 +55,8 @@ public class FollowupTaskService {
     private static final Set<String> CHANNELS =
             Set.of("phone", "sms", "mini_program", "h5", "ai", "manual");
     private static final Set<String> TRIGGER_TYPES =
-            Set.of("APPOINTMENT_COMPLETED", "SERVICE_COMPLETED", "ORDER_PAID", "MANUAL");
+            Set.of("APPOINTMENT_COMPLETED", "SERVICE_COMPLETED", "ORDER_PAID", "MANUAL",
+                    "HIS_OUTPATIENT_VISIT", "HIS_DISCHARGE", "HIS_SURGERY", "HIS_EXAM_REPORT");
 
     private final FollowupTaskRepository taskRepository;
     private final FollowupRecordRepository recordRepository;
@@ -95,6 +99,7 @@ public class FollowupTaskService {
                                                     UUID assigneeId,
                                                     UUID customerId,
                                                     Boolean escalationRequired,
+                                                    Boolean overdue,
                                                     LocalDate dateFrom,
                                                     LocalDate dateTo,
                                                     int page,
@@ -105,9 +110,119 @@ public class FollowupTaskService {
                 Sort.by(Sort.Direction.ASC, "plannedAt"));
         Page<FollowupTask> result = taskRepository.findAll(
                 buildSpecification(keyword, status, categoryCode, riskLevel, assigneeId, customerId,
-                        escalationRequired, dateFrom, dateTo),
+                        escalationRequired, overdue, dateFrom, dateTo),
                 pageable);
         return PageResponse.of(toViews(result.getContent()), result.getTotalElements(), safePage, safePageSize);
+    }
+
+    /**
+     * 随访任务统计：各状态数量、逾期（待执行且计划时间已过）与完成率，
+     * 并按五大回访板块（或 groupBy=category 时按板块下自定义分类）输出明细。
+     * visitType 仅过滤明细行，全局计数不受影响；completionRate 各维度算法一致。
+     */
+    @Transactional(readOnly = true)
+    public FollowupDtos.StatsView stats(String visitType, String groupBy) {
+        String typeFilter = visitType == null || visitType.isBlank()
+                ? null : visitType.trim().toUpperCase(java.util.Locale.ROOT);
+        if (typeFilter != null && !FollowupVisitTypes.isValid(typeFilter)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "回访板块只允许 OUTPATIENT/INPATIENT/SURGERY/EXAM/MARKETING");
+        }
+        boolean byCategory = groupBy != null && !groupBy.isBlank() && "category".equalsIgnoreCase(groupBy.trim());
+        if (groupBy != null && !groupBy.isBlank() && !byCategory
+                && !"visittype".equalsIgnoreCase(groupBy.trim())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "groupBy 只支持 visitType 或 category");
+        }
+
+        long total = taskRepository.count();
+        long pending = taskRepository.countByStatus("PENDING");
+        long inProgress = taskRepository.countByStatus("IN_PROGRESS");
+        long completed = taskRepository.countByStatus("COMPLETED");
+        long escalated = taskRepository.countByStatus("ESCALATED");
+        long cancelled = taskRepository.countByStatus("CANCELLED");
+        long overdue = taskRepository.countByStatusAndPlannedAtBefore("PENDING", Instant.now());
+        BigDecimal completionRate = completionRate(completed, pending, inProgress, escalated);
+
+        List<FollowupDtos.VisitTypeStats> visitTypes = buildVisitTypeStats(typeFilter, byCategory);
+        return new FollowupDtos.StatsView(total, pending, inProgress, completed,
+                escalated, cancelled, overdue, completionRate, visitTypes);
+    }
+
+    private List<FollowupDtos.VisitTypeStats> buildVisitTypeStats(String typeFilter, boolean byCategory) {
+        Map<String, StatsAgg> groups = new LinkedHashMap<>();
+        for (Object[] row : taskRepository.statsRowsByCategoryAndStatus()) {
+            String rowVisitType = (String) row[0];
+            String categoryCode = (String) row[1];
+            String categoryName = (String) row[2];
+            String status = (String) row[3];
+            long count = ((Number) row[4]).longValue();
+            long overdueCount = ((Number) row[5]).longValue();
+            if (typeFilter != null && !typeFilter.equals(rowVisitType)) {
+                continue;
+            }
+            String key = byCategory ? rowVisitType + "|" + categoryCode : rowVisitType;
+            groups.computeIfAbsent(key, k -> new StatsAgg(rowVisitType,
+                            byCategory ? categoryCode : null, byCategory ? categoryName : null))
+                    .accumulate(status, count, overdueCount);
+        }
+        List<String> order = FollowupVisitTypes.orderedCodes();
+        return groups.values().stream()
+                .sorted(java.util.Comparator
+                        .comparingInt((StatsAgg agg) -> order.indexOf(agg.visitType) < 0
+                                ? Integer.MAX_VALUE : order.indexOf(agg.visitType))
+                        .thenComparing(agg -> agg.categoryCode == null ? "" : agg.categoryCode))
+                .map(StatsAgg::toView)
+                .toList();
+    }
+
+    private static BigDecimal completionRate(long completed, long pending, long inProgress, long escalated) {
+        long denominator = completed + pending + inProgress + escalated;
+        return denominator == 0
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(completed).divide(BigDecimal.valueOf(denominator), 2, RoundingMode.HALF_UP);
+    }
+
+    /** 板块/分类聚合中间态：按状态累计任务数与逾期数。 */
+    private static final class StatsAgg {
+        private final String visitType;
+        private final String categoryCode;
+        private final String categoryName;
+        private long total;
+        private long pending;
+        private long inProgress;
+        private long completed;
+        private long escalated;
+        private long cancelled;
+        private long overdue;
+
+        private StatsAgg(String visitType, String categoryCode, String categoryName) {
+            this.visitType = visitType;
+            this.categoryCode = categoryCode;
+            this.categoryName = categoryName;
+        }
+
+        private void accumulate(String status, long count, long overdueCount) {
+            total += count;
+            switch (status) {
+                case "PENDING" -> {
+                    pending += count;
+                    overdue += overdueCount;
+                }
+                case "IN_PROGRESS" -> inProgress += count;
+                case "COMPLETED" -> completed += count;
+                case "ESCALATED" -> escalated += count;
+                case "CANCELLED" -> cancelled += count;
+                default -> {
+                }
+            }
+        }
+
+        private FollowupDtos.VisitTypeStats toView() {
+            return new FollowupDtos.VisitTypeStats(visitType, FollowupVisitTypes.label(visitType),
+                    categoryCode, categoryName, total, completed, pending, inProgress,
+                    escalated, cancelled, overdue,
+                    completionRate(completed, pending, inProgress, escalated));
+        }
     }
 
     @Transactional(readOnly = true)
@@ -333,6 +448,7 @@ public class FollowupTaskService {
                                                            UUID assigneeId,
                                                            UUID customerId,
                                                            Boolean escalationRequired,
+                                                           Boolean overdue,
                                                            LocalDate dateFrom,
                                                            LocalDate dateTo) {
         return (root, query, cb) -> {
@@ -357,6 +473,10 @@ public class FollowupTaskService {
             }
             if (escalationRequired != null) {
                 predicates.add(cb.equal(root.get("escalationRequired"), escalationRequired));
+            }
+            if (Boolean.TRUE.equals(overdue)) {
+                predicates.add(cb.equal(root.get("status"), "PENDING"));
+                predicates.add(cb.lessThan(root.get("plannedAt"), Instant.now()));
             }
             if (dateFrom != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("plannedAt"),

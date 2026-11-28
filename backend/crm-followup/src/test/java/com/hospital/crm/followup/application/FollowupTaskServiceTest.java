@@ -284,7 +284,7 @@ class FollowupTaskServiceTest {
                 any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
 
         PageResponse<FollowupDtos.TaskView> response =
-                service.list(null, "PENDING", null, null, null, null, null, null, null, 1, 20);
+                service.list(null, "PENDING", null, null, null, null, null, null, null, null, 1, 20);
 
         assertThat(response.total()).isEqualTo(1);
         assertThat(response.items().get(0).customerName()).isEqualTo("张三");

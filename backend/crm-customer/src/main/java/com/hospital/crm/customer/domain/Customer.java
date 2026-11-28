@@ -64,6 +64,9 @@ public class Customer {
     @Column(name = "merged_into")
     private UUID mergedInto;
 
+    @Column(name = "his_synced_at")
+    private Instant hisSyncedAt;
+
     @Column(columnDefinition = "text")
     private String notes;
 
@@ -207,6 +210,14 @@ public class Customer {
 
     public void setMergedInto(UUID mergedInto) {
         this.mergedInto = mergedInto;
+    }
+
+    public Instant getHisSyncedAt() {
+        return hisSyncedAt;
+    }
+
+    public void setHisSyncedAt(Instant hisSyncedAt) {
+        this.hisSyncedAt = hisSyncedAt;
     }
 
     public String getNotes() {

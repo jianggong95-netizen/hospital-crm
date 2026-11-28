@@ -154,6 +154,12 @@ crm:
     snapshot-valid-minutes: ${CRM_HIS_SNAPSHOT_VALID_MINUTES:30}
     snapshot-max-stale-minutes: ${CRM_HIS_SNAPSHOT_MAX_STALE_MINUTES:1440}
     read-only-check: ${CRM_HIS_READ_ONLY_CHECK:true}
+    sync:
+      # 全量患者同步开关：false 时同步端点直接拒绝
+      enabled: ${CRM_HIS_SYNC_ENABLED:true}
+      page-size: ${CRM_HIS_SYNC_PAGE_SIZE:500}
+      # 真实模式（crm.his.enabled=true）下同步任务读取的患者视图
+      patient-view: ${CRM_HIS_SYNC_PATIENT_VIEW:dbo.v_crm_patient}
     circuit-breaker:
       failure-threshold: ${CRM_HIS_BREAKER_FAILURE_THRESHOLD:5}
       open-seconds: ${CRM_HIS_BREAKER_OPEN_SECONDS:30}

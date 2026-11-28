@@ -106,6 +106,20 @@ public class CustomerIdentityService {
                 .map(this::toDto);
     }
 
+    /**
+     * 按外部标识反查绑定的 CRM 客户（不限来源系统），供 HIS 事件推送等场景使用。
+     */
+    @Transactional(readOnly = true)
+    public Optional<java.util.UUID> findCustomerId(String identityType, String identityValue) {
+        String normalized = normalize(identityValue);
+        if (normalized == null) {
+            return Optional.empty();
+        }
+        return identityRepository
+                .findFirstByIdentityTypeAndIdentityValueHash(identityType, hasher.hash(normalized))
+                .map(CustomerIdentity::getCustomerId);
+    }
+
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

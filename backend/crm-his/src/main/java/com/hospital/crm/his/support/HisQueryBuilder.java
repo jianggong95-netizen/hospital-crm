@@ -81,6 +81,47 @@ public class HisQueryBuilder {
         return new SqlQuery(sql, parameters, "his_patient_id");
     }
 
+    /**
+     * 全量患者列表查询：供 HIS 患者同步任务使用，只读、限定白名单视图并限制返回行数。
+     */
+    public SqlQuery buildPatientList(HisProperties properties, int limit) {
+        HisProperties.PatientView view = properties.getPatientView();
+        String table = qualifyTable(view.getTable(), "患者视图");
+        int safeLimit = Math.min(Math.max(limit, 1), 1000);
+        String sql = "select top (:limit) " + patientColumns(view) + " from " + table
+                + " p order by " + alias("p", view.getPatientIdColumn());
+        HisSqlGuard.validateSelect(sql, properties.allowedTables());
+        return new SqlQuery(sql, Map.of("limit", safeLimit), "his_patient_id");
+    }
+
+    /**
+     * 全量患者分页查询：真实模式下同步任务按 crm.his.sync.patient-view 视图分页读取，
+     * SQL Server 2012+ 的 OFFSET/FETCH 语法，只读且经过 SQL 守卫校验。
+     */
+    public SqlQuery buildPatientPage(HisProperties properties, int offset, int limit) {
+        HisProperties.PatientView view = properties.getPatientView();
+        String table = qualifyTable(properties.getSync().getPatientView(), "同步患者视图");
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), 1000);
+        String sql = "select " + patientColumns(view) + " from " + table + " p order by "
+                + alias("p", view.getPatientIdColumn()) + " offset :offset row fetch next :limit row only";
+        HisSqlGuard.validateSelect(sql, properties.allowedTables());
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("offset", safeOffset);
+        parameters.put("limit", safeLimit);
+        return new SqlQuery(sql, parameters, "his_patient_id");
+    }
+
+    /**
+     * 全量患者总数查询：与 {@link #buildPatientPage} 使用同一视图，供分页 hasMore 判定。
+     */
+    public SqlQuery buildPatientCount(HisProperties properties) {
+        String table = qualifyTable(properties.getSync().getPatientView(), "同步患者视图");
+        String sql = "select count(*) as [total] from " + table + " p";
+        HisSqlGuard.validateSelect(sql, properties.allowedTables());
+        return new SqlQuery(sql, Map.of(), "his_patient_id");
+    }
+
     public SqlQuery buildVisits(HisProperties properties, String externalPatientId, int limit) {
         HisProperties.VisitView view = properties.getVisitView();
         String table = qualifyTable(view.getTable(), "就诊视图");
@@ -146,6 +187,7 @@ public class HisQueryBuilder {
         columns.add(optionalColumn("p", view.getGenderColumn(), "[gender]", "varchar(400)"));
         columns.add(optionalColumn("p", view.getBirthDateColumn(), "[birth_date]", "date"));
         columns.add(optionalColumn("p", view.getMobileColumn(), "[mobile]", "varchar(400)"));
+        columns.add(optionalColumn("p", view.getIdNoColumn(), "[id_no]", "varchar(400)"));
         return String.join(", ", columns);
     }
 

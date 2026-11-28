@@ -6,8 +6,10 @@ import type {
   FamilyAuthorizationItem,
   FamilyCreatePayload,
   FamilyDetail,
+  FamilyGraph,
   FamilyMemberAddPayload,
   FamilyMemberItem,
+  FamilyMemberRelations,
   FamilyMemberUpdatePayload,
   FamilySummary
 } from '@/types/family'
@@ -34,6 +36,14 @@ export function fetchFamily(familyId: string): Promise<FamilyDetail> {
 
 export function fetchFamilyMembers(familyId: string, includeEnded = false): Promise<FamilyMemberItem[]> {
   return api.get<FamilyMemberItem[]>(`/families/${familyId}/members`, { includeEnded })
+}
+
+export function fetchFamilyGraph(familyId: string): Promise<FamilyGraph> {
+  return api.get<FamilyGraph>(`/families/${familyId}/graph`)
+}
+
+export function fetchMemberRelations(familyId: string, memberId: string): Promise<FamilyMemberRelations> {
+  return api.get<FamilyMemberRelations>(`/families/${familyId}/members/${memberId}/relations`)
 }
 
 export function addFamilyMember(familyId: string, payload: FamilyMemberAddPayload): Promise<FamilyMemberItem> {

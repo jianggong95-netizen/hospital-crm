@@ -23,6 +23,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -127,6 +128,18 @@ public class CustomerService {
     }
 
     /**
+     * 批量查询客户基础信息（含性别、出生日期），供家庭关系图谱等聚合视图使用。
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, CustomerDtos.CustomerProfile> profiles(java.util.Collection<UUID> customerIds) {
+        if (customerIds == null || customerIds.isEmpty()) {
+            return Map.of();
+        }
+        return customerRepository.findAllById(customerIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Customer::getId, this::toProfile));
+    }
+
+    /**
      * 按手机号匹配启用中的客户（来电弹屏等场景）；号码规范化后走检索哈希，不接触明文存储。
      */
     @Transactional(readOnly = true)
@@ -137,6 +150,72 @@ public class CustomerService {
         }
         return customerRepository.findFirstByPhoneHashAndStatus(hasher.hash(normalized), "active")
                 .map(this::toBrief);
+    }
+
+    /**
+     * 按证件号匹配启用中的客户（HIS 同步对账等场景）；号码规范化后走检索哈希，不接触明文存储。
+     */
+    @Transactional(readOnly = true)
+    public Optional<CustomerDtos.CustomerBrief> matchByIdNo(String idNo) {
+        String normalized = CustomerMasking.normalizeIdNo(idNo);
+        if (normalized == null || !normalized.matches("^(\\d{15}|\\d{17}[\\dX])$")) {
+            return Optional.empty();
+        }
+        return customerRepository.findFirstByIdNoHashAndStatus(hasher.hash(normalized), "active")
+                .map(this::toBrief);
+    }
+
+    /**
+     * 按姓名 + 出生日期匹配启用中的客户，供 HIS 同步等外部数据对账场景使用。
+     */
+    @Transactional(readOnly = true)
+    public Optional<CustomerDtos.CustomerBrief> matchByNameAndBirthDate(String name, LocalDate birthDate) {
+        if (name == null || name.isBlank() || birthDate == null) {
+            return Optional.empty();
+        }
+        return customerRepository.findFirstByNameAndBirthDateAndStatus(name.trim(), birthDate, "active")
+                .map(this::toBrief);
+    }
+
+    /**
+     * 补齐客户档案缺失的性别与出生日期（仅当原值为空或 unknown 时写入），返回是否发生更新。
+     */
+    @Transactional
+    public boolean fillMissingProfile(UUID customerId, String gender, LocalDate birthDate) {
+        Customer customer = load(customerId);
+        if (!"active".equals(customer.getStatus())) {
+            return false;
+        }
+        List<String> changed = new ArrayList<>();
+        if ((customer.getGender() == null || "unknown".equals(customer.getGender()))
+                && gender != null && !"unknown".equals(gender)) {
+            customer.setGender(gender);
+            changed.add("gender");
+        }
+        if (customer.getBirthDate() == null && birthDate != null) {
+            customer.setBirthDate(birthDate);
+            changed.add("birthDate");
+        }
+        if (changed.isEmpty()) {
+            return false;
+        }
+        customerRepository.save(customer);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("customerNo", customer.getCustomerNo());
+        detail.put("changedFields", changed);
+        detail.put("reason", "HIS_SYNC_FILL");
+        auditService.record("CUSTOMER_UPDATE", RESOURCE_TYPE, customerId.toString(), detail);
+        return true;
+    }
+
+    /**
+     * 记录客户最近一次 HIS 同步时间，供同步任务标记已覆盖的档案。
+     */
+    @Transactional
+    public void markHisSynced(UUID customerId) {
+        Customer customer = load(customerId);
+        customer.setHisSyncedAt(java.time.Instant.now());
+        customerRepository.save(customer);
     }
 
     @Transactional
@@ -264,6 +343,9 @@ public class CustomerService {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
+            } else {
+                // 缺省列表不展示已合并归档的客户
+                predicates.add(criteriaBuilder.notEqual(root.get("status"), "merged"));
             }
             if (gender != null && !gender.isBlank()) {
                 predicates.add(criteriaBuilder.equal(root.get("gender"), gender));
@@ -409,6 +491,17 @@ public class CustomerService {
                 customer.getName(),
                 customer.getPhoneMasked(),
                 customer.getStatus()
+        );
+    }
+
+    private CustomerDtos.CustomerProfile toProfile(Customer customer) {
+        return new CustomerDtos.CustomerProfile(
+                customer.getId(),
+                customer.getCustomerNo(),
+                customer.getName(),
+                customer.getGender(),
+                customer.getBirthDate(),
+                customer.getPhoneMasked()
         );
     }
 

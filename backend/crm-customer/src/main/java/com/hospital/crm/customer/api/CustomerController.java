@@ -1,9 +1,14 @@
 package com.hospital.crm.customer.api;
 
 import com.hospital.crm.common.api.ApiResponse;
+import com.hospital.crm.common.api.ErrorCode;
 import com.hospital.crm.common.api.PageResponse;
+import com.hospital.crm.common.exception.BusinessException;
+import com.hospital.crm.customer.application.CustomerMergeService;
 import com.hospital.crm.customer.application.CustomerService;
+import com.hospital.crm.customer.application.HisPatientSyncPort;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,9 +28,15 @@ import java.util.UUID;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final CustomerMergeService customerMergeService;
+    private final ObjectProvider<HisPatientSyncPort> hisPatientSyncPort;
 
-    public CustomerController(CustomerService customerService) {
+    public CustomerController(CustomerService customerService,
+                              CustomerMergeService customerMergeService,
+                              ObjectProvider<HisPatientSyncPort> hisPatientSyncPort) {
         this.customerService = customerService;
+        this.customerMergeService = customerMergeService;
+        this.hisPatientSyncPort = hisPatientSyncPort;
     }
 
     @GetMapping
@@ -44,6 +56,36 @@ public class CustomerController {
     @PreAuthorize("hasAuthority('crm:customer:read')")
     public ApiResponse<CustomerDtos.CustomerDetail> detail(@PathVariable UUID customerId) {
         return ApiResponse.ok(customerService.detail(customerId));
+    }
+
+    @GetMapping("/duplicates")
+    @PreAuthorize("hasAuthority('crm:customer:read')")
+    public ApiResponse<List<CustomerDtos.DuplicateGroup>> duplicates() {
+        return ApiResponse.ok(customerMergeService.findDuplicates());
+    }
+
+    @PostMapping("/{targetId}/merge")
+    @PreAuthorize("hasAuthority('crm:customer:write')")
+    public ApiResponse<CustomerDtos.MergeResponse> merge(@PathVariable UUID targetId,
+                                                         @Valid @RequestBody CustomerDtos.MergeRequest request) {
+        return ApiResponse.ok(customerMergeService.merge(targetId, request.sourceId()));
+    }
+
+    @PostMapping("/{targetId}/merge/{sourceId}")
+    @PreAuthorize("hasAuthority('crm:customer:write')")
+    public ApiResponse<CustomerDtos.MergeResponse> mergeByIds(@PathVariable UUID targetId,
+                                                              @PathVariable UUID sourceId) {
+        return ApiResponse.ok(customerMergeService.merge(targetId, sourceId));
+    }
+
+    @PostMapping("/sync-his")
+    @PreAuthorize("hasAuthority('crm:customer:write')")
+    public ApiResponse<CustomerDtos.HisSyncResult> syncHis() {
+        HisPatientSyncPort port = hisPatientSyncPort.getIfAvailable();
+        if (port == null) {
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "HIS 患者同步能力未启用");
+        }
+        return ApiResponse.ok(port.syncFromHis());
     }
 
     @PostMapping

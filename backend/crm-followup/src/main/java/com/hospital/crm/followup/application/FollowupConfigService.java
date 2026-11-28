@@ -32,8 +32,11 @@ public class FollowupConfigService {
     private static final Set<String> CHANNELS =
             Set.of("phone", "sms", "mini_program", "h5", "ai", "manual");
     private static final Set<String> TRIGGER_TYPES =
-            Set.of("APPOINTMENT_COMPLETED", "SERVICE_COMPLETED", "ORDER_PAID", "MANUAL");
+            Set.of("APPOINTMENT_COMPLETED", "SERVICE_COMPLETED", "ORDER_PAID", "MANUAL",
+                    "HIS_OUTPATIENT_VISIT", "HIS_DISCHARGE", "HIS_SURGERY", "HIS_EXAM_REPORT");
     private static final Set<String> CONFIG_STATUSES = Set.of("active", "disabled");
+    private static final Set<String> VISIT_TYPES =
+            Set.of("OUTPATIENT", "INPATIENT", "SURGERY", "EXAM", "MARKETING");
 
     private final FollowupCategoryRepository categoryRepository;
     private final FollowupTemplateRepository templateRepository;
@@ -57,10 +60,15 @@ public class FollowupConfigService {
     // 分类
     // ------------------------------------------------------------------
     @Transactional(readOnly = true)
-    public List<FollowupDtos.CategoryView> listCategories(String status) {
+    public List<FollowupDtos.CategoryView> listCategories(String status, String visitType) {
         List<FollowupCategory> categories = status == null || status.isBlank()
                 ? categoryRepository.findAllByOrderBySortNoAsc()
                 : categoryRepository.findByStatusOrderBySortNoAsc(status);
+        if (visitType != null && !visitType.isBlank()) {
+            categories = categories.stream()
+                    .filter(category -> visitType.equals(category.getVisitType()))
+                    .toList();
+        }
         return categories.stream().map(this::toCategoryView).toList();
     }
 
@@ -69,14 +77,17 @@ public class FollowupConfigService {
         categoryRepository.findByCategoryCode(request.categoryCode()).ifPresent(existing -> {
             throw new BusinessException(ErrorCode.BUSINESS_CONFLICT, "随访分类编码已存在");
         });
+        validateVisitType(request.visitType());
         FollowupCategory category = new FollowupCategory();
         category.setCategoryCode(request.categoryCode());
         category.setCategoryName(request.categoryName());
+        category.setVisitType(request.visitType());
         category.setDescription(request.description());
         category.setSortNo(request.sortNo() == null ? 0 : request.sortNo());
         categoryRepository.save(category);
         auditService.record("FOLLOWUP_CATEGORY_CREATE", "CRM_FOLLOWUP_CATEGORY",
-                category.getCategoryCode(), Map.of("name", category.getCategoryName()));
+                category.getCategoryCode(), Map.of("name", category.getCategoryName(),
+                        "visitType", category.getVisitType()));
         return toCategoryView(category);
     }
 
@@ -84,6 +95,10 @@ public class FollowupConfigService {
     public FollowupDtos.CategoryView updateCategory(String categoryCode, FollowupDtos.CategoryUpdateRequest request) {
         FollowupCategory category = requireCategory(categoryCode);
         category.setCategoryName(request.categoryName());
+        if (request.visitType() != null && !request.visitType().isBlank()) {
+            validateVisitType(request.visitType());
+            category.setVisitType(request.visitType());
+        }
         category.setDescription(request.description());
         if (request.sortNo() != null) {
             category.setSortNo(request.sortNo());
@@ -259,6 +274,13 @@ public class FollowupConfigService {
         }
     }
 
+    private void validateVisitType(String visitType) {
+        if (!VISIT_TYPES.contains(visitType)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "回访板块只允许门诊/住院/手术/体检/营销");
+        }
+    }
+
     private void validateTriggerType(String triggerType) {
         if (!TRIGGER_TYPES.contains(triggerType)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的随访触发类型");
@@ -280,7 +302,7 @@ public class FollowupConfigService {
 
     private FollowupDtos.CategoryView toCategoryView(FollowupCategory category) {
         return new FollowupDtos.CategoryView(category.getCategoryCode(), category.getCategoryName(),
-                category.getDescription(), category.getStatus(), category.getSortNo());
+                category.getVisitType(), category.getDescription(), category.getStatus(), category.getSortNo());
     }
 
     private FollowupDtos.TemplateView toTemplateView(FollowupTemplate template) {

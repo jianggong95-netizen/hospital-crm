@@ -11,5 +11,8 @@ public interface CustomerIdentityRepository extends JpaRepository<CustomerIdenti
     Optional<CustomerIdentity> findFirstBySourceSystemAndIdentityTypeAndIdentityValueHash(
             String sourceSystem, String identityType, String identityValueHash);
 
+    Optional<CustomerIdentity> findFirstByIdentityTypeAndIdentityValueHash(
+            String identityType, String identityValueHash);
+
     List<CustomerIdentity> findByCustomerId(UUID customerId);
 }

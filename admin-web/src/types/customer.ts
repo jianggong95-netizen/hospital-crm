@@ -20,7 +20,7 @@ export interface CustomerSummary {
   phoneMasked?: string
   idNoMasked?: string
   sourceCode?: string
-  status: 'active' | 'disabled'
+  status: 'active' | 'disabled' | 'merged'
   tags: TagSummary[]
   createdAt: string
   updatedAt: string
@@ -68,4 +68,34 @@ export interface TagUpdatePayload {
   tagType?: string
   sortOrder?: number
   status?: 'active' | 'disabled'
+}
+
+export interface HisSyncResult {
+  total: number
+  created: number
+  linked: number
+  updated: number
+  skipped: number
+}
+
+export interface DuplicateCustomerItem {
+  id: string
+  customerNo: string
+  name: string
+  phoneMasked?: string
+  birthDate?: string
+  createdAt: string
+}
+
+export interface CustomerDuplicateGroup {
+  reason: 'phone' | 'name_birth'
+  items: DuplicateCustomerItem[]
+}
+
+export interface CustomerMergeResult {
+  targetId: string
+  sourceId: string
+  mergedTables: Record<string, number>
+  removedRows: Record<string, number>
+  filledFields?: string[]
 }

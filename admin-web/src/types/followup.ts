@@ -10,10 +10,17 @@ export type FollowupTriggerType =
   | 'SERVICE_COMPLETED'
   | 'ORDER_PAID'
   | 'MANUAL'
+  | 'HIS_OUTPATIENT_VISIT'
+  | 'HIS_DISCHARGE'
+  | 'HIS_SURGERY'
+  | 'HIS_EXAM_REPORT'
+
+export type FollowupVisitType = 'OUTPATIENT' | 'INPATIENT' | 'SURGERY' | 'EXAM' | 'MARKETING'
 
 export interface FollowupCategory {
   categoryCode: string
   categoryName: string
+  visitType: FollowupVisitType
   description?: string
   status: FollowupConfigStatus
   sortNo: number
@@ -111,4 +118,66 @@ export interface FollowupTriggerResult {
   created: number
   skipped: number
   tasks: FollowupTask[]
+}
+
+export interface FollowupVisitTypeStat {
+  visitType: FollowupVisitType
+  visitTypeLabel: string
+  categoryCode?: string | null
+  categoryName?: string | null
+  totalTasks: number
+  completedTasks: number
+  pendingTasks: number
+  inProgressTasks: number
+  escalatedTasks: number
+  cancelledTasks: number
+  overdueTasks: number
+  completionRate: number
+}
+
+export interface FollowupStats {
+  total: number
+  pending: number
+  inProgress: number
+  completed: number
+  escalated: number
+  cancelled: number
+  overdue: number
+  completionRate: number
+  visitTypes: FollowupVisitTypeStat[]
+}
+
+// ------------------------------------------------------------------
+// HIS 事件对接
+// ------------------------------------------------------------------
+export type FollowupHisEventType =
+  | 'HIS_OUTPATIENT_VISIT'
+  | 'HIS_DISCHARGE'
+  | 'HIS_SURGERY'
+  | 'HIS_EXAM_REPORT'
+
+export interface FollowupHisEventPayload {
+  eventType: FollowupHisEventType
+  eventKey: string
+  customerId?: string
+  externalPatientId?: string
+  sourceSystem?: string
+  occurredAt?: string
+  payload?: Record<string, unknown>
+}
+
+export interface FollowupHisEvent {
+  id: string
+  eventKey: string
+  eventType: FollowupHisEventType
+  customerId?: string
+  customerName?: string
+  externalPatientId?: string
+  sourceSystem: string
+  occurredAt?: string
+  status: 'PROCESSED' | 'NO_MATCH' | 'FAILED'
+  createdTasks: number
+  skippedTasks: number
+  errorMessage?: string
+  createdAt: string
 }

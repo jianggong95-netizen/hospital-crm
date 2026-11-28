@@ -2,7 +2,10 @@ import { api } from './http'
 import type { PageResponse } from '@/types/system'
 import type {
   FollowupCategory,
+  FollowupHisEvent,
+  FollowupHisEventPayload,
   FollowupPlan,
+  FollowupStats,
   FollowupTask,
   FollowupTaskCreatePayload,
   FollowupTaskDetail,
@@ -20,6 +23,7 @@ export interface FollowupTaskQuery {
   assigneeId?: string
   customerId?: string
   escalationRequired?: boolean
+  overdue?: boolean
   dateFrom?: string
   dateTo?: string
   page?: number
@@ -29,8 +33,8 @@ export interface FollowupTaskQuery {
 // ------------------------------------------------------------------
 // 分类
 // ------------------------------------------------------------------
-export function fetchFollowupCategories(status?: string): Promise<FollowupCategory[]> {
-  return api.get<FollowupCategory[]>('/followup/categories', { status })
+export function fetchFollowupCategories(status?: string, visitType?: string): Promise<FollowupCategory[]> {
+  return api.get<FollowupCategory[]>('/followup/categories', { status, visitType })
 }
 
 export function createFollowupCategory(payload: Partial<FollowupCategory>): Promise<FollowupCategory> {
@@ -98,6 +102,15 @@ export function fetchFollowupTasks(query: FollowupTaskQuery): Promise<PageRespon
   return api.get<PageResponse<FollowupTask>>('/followup/tasks', query)
 }
 
+export interface FollowupStatsQuery {
+  visitType?: string
+  groupBy?: 'visitType' | 'category'
+}
+
+export function fetchFollowupStats(query?: FollowupStatsQuery): Promise<FollowupStats> {
+  return api.get<FollowupStats>('/followup/stats', query)
+}
+
 export function fetchFollowupTaskDetail(taskId: string): Promise<FollowupTaskDetail> {
   return api.get<FollowupTaskDetail>(`/followup/tasks/${taskId}`)
 }
@@ -135,4 +148,19 @@ export function resolveFollowupTask(taskId: string, remark?: string): Promise<Fo
 
 export function cancelFollowupTask(taskId: string, reason: string): Promise<FollowupTask> {
   return api.put<FollowupTask>(`/followup/tasks/${taskId}/cancel`, { reason })
+}
+
+// ------------------------------------------------------------------
+// HIS 事件对接
+// ------------------------------------------------------------------
+export function pushFollowupHisEvent(payload: FollowupHisEventPayload): Promise<FollowupHisEvent> {
+  return api.post<FollowupHisEvent>('/followup/his/events', payload)
+}
+
+export function fetchFollowupHisEvents(params: {
+  status?: string
+  page?: number
+  pageSize?: number
+}): Promise<PageResponse<FollowupHisEvent>> {
+  return api.get<PageResponse<FollowupHisEvent>>('/followup/his/events', params)
 }

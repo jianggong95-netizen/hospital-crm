@@ -52,7 +52,8 @@ class HisPatientQueryH2Test {
                   patient_name varchar(100),
                   gender varchar(16),
                   birth_date date,
-                  mobile varchar(32)
+                  mobile varchar(32),
+                  id_no varchar(32)
                 )
                 """);
         template.getJdbcOperations().execute("""

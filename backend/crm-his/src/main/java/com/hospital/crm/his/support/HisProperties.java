@@ -31,6 +31,7 @@ public class HisProperties {
     private PatientView patientView = new PatientView();
     private VisitView visitView = new VisitView();
     private AdmissionView admissionView = new AdmissionView();
+    private Sync sync = new Sync();
 
     public boolean configured() {
         return enabled && url != null && !url.isBlank();
@@ -44,6 +45,7 @@ public class HisProperties {
         addIfPresent(tables, patientView.getTable());
         addIfPresent(tables, visitView.getTable());
         addIfPresent(tables, admissionView.getTable());
+        addIfPresent(tables, sync.getPatientView());
         return tables;
     }
 
@@ -203,6 +205,48 @@ public class HisProperties {
 
     public void setAdmissionView(AdmissionView admissionView) {
         this.admissionView = admissionView;
+    }
+
+    public Sync getSync() {
+        return sync;
+    }
+
+    public void setSync(Sync sync) {
+        this.sync = sync == null ? new Sync() : sync;
+    }
+
+    /**
+     * HIS 患者全量同步配置：enabled 关闭时同步端点直接拒绝；
+     * patientView 为真实模式下同步任务读取的全量患者视图（默认与查询视图一致）。
+     */
+    public static class Sync {
+        private boolean enabled = true;
+        private int pageSize = 500;
+        private String patientView = "dbo.v_crm_patient";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getPageSize() {
+            return pageSize;
+        }
+
+        public void setPageSize(int pageSize) {
+            this.pageSize = pageSize;
+        }
+
+        public String getPatientView() {
+            return patientView;
+        }
+
+        public void setPatientView(String patientView) {
+            this.patientView = patientView;
+        }
     }
 
     public static class CircuitBreaker {

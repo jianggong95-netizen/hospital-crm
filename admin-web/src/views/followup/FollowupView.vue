@@ -15,10 +15,13 @@ import {
   createFollowupTemplate,
   escalateFollowupTask,
   fetchFollowupCategories,
+  fetchFollowupHisEvents,
   fetchFollowupPlans,
+  fetchFollowupStats,
   fetchFollowupTaskDetail,
   fetchFollowupTasks,
   fetchFollowupTemplates,
+  pushFollowupHisEvent,
   resolveFollowupTask,
   startFollowupTask,
   submitFollowupRecord,
@@ -32,11 +35,15 @@ import type { UserResponse } from '@/types/system'
 import type {
   FollowupCategory,
   FollowupChannel,
+  FollowupHisEvent,
+  FollowupHisEventType,
   FollowupPlan,
+  FollowupStats,
   FollowupTask,
   FollowupTaskDetail,
   FollowupTemplate,
-  FollowupTriggerType
+  FollowupTriggerType,
+  FollowupVisitType
 } from '@/types/followup'
 
 const auth = useAuthStore()
@@ -69,8 +76,32 @@ const triggerLabels: Record<string, string> = {
   APPOINTMENT_COMPLETED: '预约完成',
   SERVICE_COMPLETED: '服务完成',
   ORDER_PAID: '订单支付',
-  MANUAL: '手工'
+  MANUAL: '手工',
+  HIS_OUTPATIENT_VISIT: 'HIS 门诊就诊',
+  HIS_DISCHARGE: 'HIS 出院',
+  HIS_SURGERY: 'HIS 手术完成',
+  HIS_EXAM_REPORT: 'HIS 体检报告'
 }
+
+const visitTypeLabels: Record<string, string> = {
+  OUTPATIENT: '门诊回访',
+  INPATIENT: '住院回访',
+  SURGERY: '手术回访',
+  EXAM: '体检回访',
+  MARKETING: '营销回访'
+}
+
+const visitTypeOrder: FollowupVisitType[] = ['OUTPATIENT', 'INPATIENT', 'SURGERY', 'EXAM', 'MARKETING']
+
+// 分类按板块分组，供筛选与下拉使用
+const groupedCategories = computed(() =>
+  visitTypeOrder
+    .map(type => ({
+      label: visitTypeLabels[type],
+      options: categories.value.filter(item => (item.visitType || 'OUTPATIENT') === type)
+    }))
+    .filter(group => group.options.length > 0)
+)
 
 function statusTag(status: string) {
   if (status === 'COMPLETED') return 'success'
@@ -139,6 +170,7 @@ const taskQuery = reactive({
   categoryCode: '',
   riskLevel: '',
   escalationRequired: false as boolean | undefined,
+  overdue: false,
   page: 1,
   pageSize: 20
 })
@@ -154,6 +186,7 @@ async function loadTasks() {
       categoryCode: taskQuery.categoryCode || undefined,
       riskLevel: taskQuery.riskLevel || undefined,
       escalationRequired: taskQuery.escalationRequired,
+      overdue: taskQuery.overdue || undefined,
       page: taskQuery.page,
       pageSize: taskQuery.pageSize
     })
@@ -163,6 +196,29 @@ async function loadTasks() {
     loading.value = false
   }
 }
+
+// 任务统计卡片
+const stats = ref<FollowupStats | null>(null)
+const statsGroupBy = ref<'visitType' | 'category'>('visitType')
+
+async function loadStats() {
+  try {
+    stats.value = await fetchFollowupStats({ groupBy: statsGroupBy.value })
+  } catch {
+    stats.value = null
+  }
+}
+
+const statsCards = computed(() => {
+  const s = stats.value
+  return [
+    { label: '总任务', value: s ? String(s.total) : '—', tone: '' },
+    { label: '待执行', value: s ? String(s.pending) : '—', tone: '' },
+    { label: '逾期', value: s ? String(s.overdue) : '—', tone: 'danger' },
+    { label: '人工队列', value: s ? String(s.escalated) : '—', tone: 'warning' },
+    { label: '完成率', value: s ? `${Math.round(s.completionRate * 100)}%` : '—', tone: 'success' }
+  ]
+})
 
 const escalationQuery = reactive({ page: 1, pageSize: 20 })
 const escalationRows = ref<FollowupTask[]>([])
@@ -501,11 +557,18 @@ async function toggleTemplate(row: FollowupTemplate) {
 // 分类
 // ------------------------------------------------------------------
 const categoryVisible = ref(false)
-const categoryForm = reactive({ categoryCode: '', categoryName: '', description: '', sortNo: 0 })
+const categoryForm = reactive({
+  categoryCode: '',
+  categoryName: '',
+  visitType: 'OUTPATIENT' as FollowupVisitType,
+  description: '',
+  sortNo: 0
+})
 
 function openCategoryDialog(row?: FollowupCategory) {
   categoryForm.categoryCode = row?.categoryCode || ''
   categoryForm.categoryName = row?.categoryName || ''
+  categoryForm.visitType = row?.visitType || 'OUTPATIENT'
   categoryForm.description = row?.description || ''
   categoryForm.sortNo = row?.sortNo ?? 0
   categoryVisible.value = true
@@ -514,6 +577,7 @@ function openCategoryDialog(row?: FollowupCategory) {
 async function submitCategory() {
   const payload = {
     categoryName: categoryForm.categoryName,
+    visitType: categoryForm.visitType,
     description: categoryForm.description || undefined,
     sortNo: categoryForm.sortNo
   }
@@ -532,16 +596,107 @@ async function submitCategory() {
 }
 
 // ------------------------------------------------------------------
+// HIS 事件对接
+// ------------------------------------------------------------------
+const hisEventTypeLabels: Record<string, string> = {
+  HIS_OUTPATIENT_VISIT: '门诊就诊完成',
+  HIS_DISCHARGE: '出院',
+  HIS_SURGERY: '手术完成',
+  HIS_EXAM_REPORT: '体检报告出具'
+}
+
+const hisStatusLabels: Record<string, string> = {
+  PROCESSED: '已处理',
+  NO_MATCH: '未匹配客户',
+  FAILED: '处理失败'
+}
+
+const hisForm = reactive({
+  eventType: 'HIS_OUTPATIENT_VISIT' as FollowupHisEventType,
+  eventKey: '',
+  customerId: '',
+  externalPatientId: ''
+})
+const hisSubmitting = ref(false)
+
+function genHisEventKey() {
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  hisForm.eventKey = `HIS-${stamp}-${Math.floor(Math.random() * 900000 + 100000)}`
+}
+
+async function submitHisEvent() {
+  if (!hisForm.eventKey) {
+    ElMessage.warning('请填写事件键（幂等去重依据）')
+    return
+  }
+  if (!hisForm.customerId && !hisForm.externalPatientId) {
+    ElMessage.warning('请选择客户或填写 HIS 患者主索引')
+    return
+  }
+  hisSubmitting.value = true
+  try {
+    const result = await pushFollowupHisEvent({
+      eventType: hisForm.eventType,
+      eventKey: hisForm.eventKey,
+      customerId: hisForm.customerId || undefined,
+      externalPatientId: hisForm.externalPatientId || undefined
+    })
+    if (result.status === 'PROCESSED') {
+      ElMessage.success(`事件已处理：新建 ${result.createdTasks} 个随访任务，跳过 ${result.skippedTasks} 个`)
+    } else {
+      ElMessage.warning(`事件已记录（${hisStatusLabels[result.status]}）：${result.errorMessage || ''}`)
+    }
+    hisForm.eventKey = ''
+    genHisEventKey()
+    await Promise.all([loadHisEvents(), loadTasks()])
+  } catch (error) {
+    ElMessage.error((error as Error).message || '推送失败')
+  } finally {
+    hisSubmitting.value = false
+  }
+}
+
+const hisLoading = ref(false)
+const hisRows = ref<FollowupHisEvent[]>([])
+const hisTotal = ref(0)
+const hisQuery = reactive({ status: '', page: 1, pageSize: 20 })
+
+async function loadHisEvents() {
+  hisLoading.value = true
+  try {
+    const result = await fetchFollowupHisEvents({
+      status: hisQuery.status || undefined,
+      page: hisQuery.page,
+      pageSize: hisQuery.pageSize
+    })
+    hisRows.value = result.items
+    hisTotal.value = result.total
+  } finally {
+    hisLoading.value = false
+  }
+}
+
+function hisStatusTag(status: string) {
+  if (status === 'PROCESSED') return 'success'
+  if (status === 'NO_MATCH') return 'warning'
+  return 'danger'
+}
+
+// ------------------------------------------------------------------
 // 初始化
 // ------------------------------------------------------------------
 function handleTabChange(name: string) {
-  if (name === 'tasks') void loadTasks()
+  if (name === 'tasks') {
+    void loadTasks()
+    void loadStats()
+  }
   if (name === 'escalations') void loadEscalations()
+  if (name === 'his') void loadHisEvents()
 }
 
 onMounted(async () => {
   await loadBase()
-  await loadTasks()
+  await Promise.all([loadTasks(), loadStats()])
 })
 </script>
 
@@ -551,7 +706,8 @@ onMounted(async () => {
       <div>
         <h2>随访中心</h2>
         <p class="page-desc">
-          按分类模板与计划生成随访任务，事件重复投递不会重复建单；随访答案按风险规则评估，高风险自动进入人工队列。
+          随访分为门诊 / 住院 / 手术 / 体检 / 营销五大回访板块，板块下可自定义子分类与模板；
+          HIS 推送业务事件后按启用计划自动建单（事件键幂等），高风险回答自动进入人工队列。
         </p>
       </div>
     </header>
@@ -559,19 +715,69 @@ onMounted(async () => {
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <!-- 任务 -->
       <el-tab-pane label="随访任务" name="tasks">
+        <div class="stats-row">
+          <div v-for="card in statsCards" :key="card.label" class="stat-card">
+            <span class="stat-value" :class="card.tone ? `stat-${card.tone}` : ''">{{ card.value }}</span>
+            <span class="stat-label">{{ card.label }}</span>
+          </div>
+        </div>
+
+        <!-- 回访板块统计：默认按板块聚合卡片，可切换按分类查看明细 -->
+        <div class="visit-stats">
+          <div class="visit-stats-head">
+            <span class="visit-stats-title">回访板块统计</span>
+            <el-select v-model="statsGroupBy" size="small" style="width: 150px" @change="loadStats">
+              <el-option label="按回访板块" value="visitType" />
+              <el-option label="按自定义分类" value="category" />
+            </el-select>
+          </div>
+          <div v-if="statsGroupBy === 'visitType'" class="visit-cards">
+            <div v-for="row in stats?.visitTypes || []" :key="row.visitType" class="visit-card">
+              <span class="visit-card-title">{{ row.visitTypeLabel || visitTypeLabels[row.visitType] || row.visitType }}</span>
+              <div class="visit-card-metrics">
+                <span>任务 {{ row.totalTasks }}</span>
+                <span>完成 {{ row.completedTasks }}</span>
+                <span>逾期 {{ row.overdueTasks }}</span>
+                <span class="visit-card-rate">完成率 {{ Math.round(row.completionRate * 100) }}%</span>
+              </div>
+            </div>
+            <span v-if="!stats?.visitTypes?.length" class="hint">暂无统计数据</span>
+          </div>
+          <el-table v-else :data="stats?.visitTypes || []" size="small" border stripe empty-text="暂无统计数据">
+            <el-table-column label="板块" width="110">
+              <template #default="{ row }">
+                {{ row.visitTypeLabel || visitTypeLabels[row.visitType] || row.visitType }}
+              </template>
+            </el-table-column>
+            <el-table-column label="分类" min-width="150">
+              <template #default="{ row }">{{ row.categoryName || row.categoryCode || '—' }}</template>
+            </el-table-column>
+            <el-table-column prop="totalTasks" label="任务数" width="90" align="center" />
+            <el-table-column prop="completedTasks" label="完成数" width="90" align="center" />
+            <el-table-column prop="pendingTasks" label="待执行" width="90" align="center" />
+            <el-table-column prop="overdueTasks" label="逾期数" width="90" align="center" />
+            <el-table-column label="完成率" width="100" align="center">
+              <template #default="{ row }">{{ Math.round(row.completionRate * 100) }}%</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
         <div class="toolbar">
           <el-input v-model="taskQuery.keyword" placeholder="任务号" clearable style="width: 150px" />
           <el-select v-model="taskQuery.status" placeholder="全部状态" clearable style="width: 130px">
             <el-option v-for="(label, key) in statusLabels" :key="key" :label="label" :value="key" />
           </el-select>
-          <el-select v-model="taskQuery.categoryCode" placeholder="全部分类" clearable style="width: 140px">
-            <el-option v-for="item in categories" :key="item.categoryCode" :label="item.categoryName" :value="item.categoryCode" />
+          <el-select v-model="taskQuery.categoryCode" placeholder="全部分类" clearable style="width: 200px">
+            <el-option-group v-for="group in groupedCategories" :key="group.label" :label="group.label">
+              <el-option v-for="item in group.options" :key="item.categoryCode" :label="item.categoryName" :value="item.categoryCode" />
+            </el-option-group>
           </el-select>
           <el-select v-model="taskQuery.riskLevel" placeholder="全部风险" clearable style="width: 120px">
             <el-option label="低风险" value="LOW" />
             <el-option label="中风险" value="MEDIUM" />
             <el-option label="高风险" value="HIGH" />
           </el-select>
+          <el-switch v-model="taskQuery.overdue" active-text="仅看逾期" @change="taskQuery.page = 1; loadTasks()" />
           <el-button type="primary" @click="taskQuery.page = 1; loadTasks()">查询</el-button>
           <el-button v-if="canWrite" @click="openCreateTask">新建任务</el-button>
           <el-button v-if="canWrite" @click="openTrigger">事件触发</el-button>
@@ -754,7 +960,12 @@ onMounted(async () => {
           <el-button v-if="canManage" @click="openCategoryDialog()">新建分类</el-button>
         </div>
         <el-table :data="categories" border stripe>
-          <el-table-column prop="categoryCode" label="分类编码" width="160" />
+          <el-table-column label="板块" width="110">
+            <template #default="{ row }">
+              <el-tag effect="plain">{{ visitTypeLabels[row.visitType] || row.visitType }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="categoryCode" label="分类编码" width="180" />
           <el-table-column prop="categoryName" label="分类名称" min-width="150" />
           <el-table-column prop="description" label="说明" min-width="220" />
           <el-table-column prop="sortNo" label="排序" width="80" />
@@ -771,6 +982,76 @@ onMounted(async () => {
             </template>
           </el-table-column>
         </el-table>
+      </el-tab-pane>
+
+      <!-- HIS 对接 -->
+      <el-tab-pane label="HIS 对接" name="his">
+        <el-alert type="info" :closable="false" class="his-note">
+          <p><strong>接口预留</strong>：HIS / 集成平台调用 <code>POST /api/v1/followup/his/events</code> 推送业务事件，</p>
+          <p>CRM 按事件键幂等去重，自动匹配启用中的随访计划生成任务；客户定位支持 <code>customerId</code> 直传，或 <code>externalPatientId</code>（HIS 患者主索引，经患者绑定关系反查）。</p>
+          <p>事件类型：HIS_OUTPATIENT_VISIT（门诊就诊）/ HIS_DISCHARGE（出院）/ HIS_SURGERY（手术完成）/ HIS_EXAM_REPORT（体检报告）。</p>
+        </el-alert>
+
+        <div v-if="canWrite" class="his-push">
+          <h4>模拟 HIS 推送（演示用）</h4>
+          <div class="toolbar">
+            <el-select v-model="hisForm.eventType" style="width: 160px">
+              <el-option v-for="(label, key) in hisEventTypeLabels" :key="key" :label="label" :value="key" />
+            </el-select>
+            <el-input v-model="hisForm.eventKey" placeholder="事件键" style="width: 220px">
+              <template #append>
+                <el-button @click="genHisEventKey">生成</el-button>
+              </template>
+            </el-input>
+            <el-select
+              v-model="hisForm.customerId"
+              placeholder="CRM 客户（可选）"
+              clearable
+              filterable
+              remote
+              :remote-method="searchCustomers"
+              style="width: 200px"
+            >
+              <el-option v-for="item in customerOptions" :key="item.id" :label="customerLabel(item)" :value="item.id" />
+            </el-select>
+            <el-input v-model="hisForm.externalPatientId" placeholder="HIS 患者主索引（可选）" style="width: 200px" />
+            <el-button type="primary" :loading="hisSubmitting" @click="submitHisEvent">推送事件</el-button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <el-select v-model="hisQuery.status" placeholder="全部状态" clearable style="width: 140px" @change="hisQuery.page = 1; loadHisEvents()">
+            <el-option v-for="(label, key) in hisStatusLabels" :key="key" :label="label" :value="key" />
+          </el-select>
+          <el-button type="primary" @click="loadHisEvents">刷新事件日志</el-button>
+        </div>
+        <el-table v-loading="hisLoading" :data="hisRows" border stripe empty-text="暂无 HIS 事件">
+          <el-table-column prop="eventKey" label="事件键" min-width="180" />
+          <el-table-column label="事件类型" width="130">
+            <template #default="{ row }">{{ hisEventTypeLabels[row.eventType] || row.eventType }}</template>
+          </el-table-column>
+          <el-table-column prop="customerName" label="客户" width="110" />
+          <el-table-column prop="externalPatientId" label="HIS 主索引" width="130" />
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag :type="hisStatusTag(row.status)">{{ hisStatusLabels[row.status] || row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="新建/跳过" width="100">
+            <template #default="{ row }">{{ row.createdTasks }} / {{ row.skippedTasks }}</template>
+          </el-table-column>
+          <el-table-column prop="errorMessage" label="说明" min-width="180" show-overflow-tooltip />
+          <el-table-column label="接收时间" width="150">
+            <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          v-model:current-page="hisQuery.page"
+          v-model:page-size="hisQuery.pageSize"
+          :total="hisTotal"
+          layout="total, prev, pager, next"
+          @current-change="loadHisEvents"
+        />
       </el-tab-pane>
     </el-tabs>
 
@@ -1000,6 +1281,11 @@ onMounted(async () => {
         <el-form-item label="分类名称" required>
           <el-input v-model="categoryForm.categoryName" />
         </el-form-item>
+        <el-form-item label="所属板块" required>
+          <el-select v-model="categoryForm.visitType" style="width: 100%">
+            <el-option v-for="type in visitTypeOrder" :key="type" :label="visitTypeLabels[type]" :value="type" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="categoryForm.sortNo" :min="0" style="width: 100%" />
         </el-form-item>
@@ -1058,5 +1344,116 @@ h4 {
 .answer-block,
 .record-block {
   margin-top: 8px;
+}
+
+.his-note p {
+  margin: 2px 0;
+  line-height: 1.7;
+}
+
+.his-push {
+  margin: 14px 0 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--el-border-color);
+  border-radius: 8px;
+}
+
+.his-push h4 {
+  margin: 0 0 10px;
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.stat-card {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.stat-danger {
+  color: var(--el-color-danger);
+}
+
+.stat-warning {
+  color: var(--el-color-warning);
+}
+
+.stat-success {
+  color: var(--el-color-success);
+}
+
+.visit-stats {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+}
+
+.visit-stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.visit-stats-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.visit-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.visit-card {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+}
+
+.visit-card-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.visit-card-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.visit-card-rate {
+  color: var(--el-color-success);
+  font-weight: 600;
 }
 </style>

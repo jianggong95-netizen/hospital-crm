@@ -58,6 +58,20 @@ public class FamilyController {
         return ApiResponse.ok(familyService.members(familyId, includeEnded));
     }
 
+    @GetMapping("/{familyId}/graph")
+    @PreAuthorize("hasAuthority('crm:family:read')")
+    public ApiResponse<FamilyDtos.FamilyGraph> graph(@PathVariable UUID familyId) {
+        return ApiResponse.ok(familyService.graph(familyId));
+    }
+
+    @GetMapping("/{familyId}/members/{memberId}/relations")
+    @PreAuthorize("hasAuthority('crm:family:read')")
+    public ApiResponse<FamilyDtos.MemberRelations> memberRelations(
+            @PathVariable UUID familyId,
+            @PathVariable UUID memberId) {
+        return ApiResponse.ok(familyService.relations(familyId, memberId));
+    }
+
     @PostMapping("/{familyId}/members")
     @PreAuthorize("hasAuthority('crm:family:write')")
     public ApiResponse<FamilyDtos.MemberItem> addMember(@PathVariable UUID familyId,

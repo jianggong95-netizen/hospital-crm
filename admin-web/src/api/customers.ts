@@ -2,8 +2,11 @@ import { api } from './http'
 import type {
   CustomerCreatePayload,
   CustomerDetail,
+  CustomerDuplicateGroup,
+  CustomerMergeResult,
   CustomerSummary,
-  CustomerUpdatePayload
+  CustomerUpdatePayload,
+  HisSyncResult
 } from '@/types/customer'
 import type { PageResponse } from '@/types/system'
 
@@ -35,4 +38,16 @@ export function updateCustomer(customerId: string, payload: CustomerUpdatePayloa
 
 export function changeCustomerStatus(customerId: string, status: 'active' | 'disabled'): Promise<void> {
   return api.patch<void>(`/customers/${customerId}/status`, { status })
+}
+
+export function syncHisPatients(): Promise<HisSyncResult> {
+  return api.post<HisSyncResult>('/customers/sync-his')
+}
+
+export function fetchCustomerDuplicates(): Promise<CustomerDuplicateGroup[]> {
+  return api.get<CustomerDuplicateGroup[]>('/customers/duplicates')
+}
+
+export function mergeCustomers(targetId: string, sourceId: string): Promise<CustomerMergeResult> {
+  return api.post<CustomerMergeResult>(`/customers/${targetId}/merge`, { sourceId })
 }

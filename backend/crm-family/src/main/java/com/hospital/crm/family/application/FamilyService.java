@@ -107,6 +107,101 @@ public class FamilyService {
     }
 
     /**
+     * 家庭关系图谱：返回全部有效成员节点与两两之间的称谓边。
+     * 成员关系仅存相对户主的编码，其他成员间的称谓由 deriveRelation 演示级推导。
+     */
+    @Transactional(readOnly = true)
+    public FamilyDtos.FamilyGraph graph(UUID familyId) {
+        load(familyId);
+        List<FamilyMember> members =
+                memberRepository.findByFamilyIdAndStatusOrderByAdminDescValidFromAsc(familyId, ACTIVE);
+        Map<UUID, CustomerDtos.CustomerProfile> profiles = customerService.profiles(
+                members.stream().map(FamilyMember::getCustomerId).toList());
+
+        List<FamilyDtos.GraphNode> nodes = members.stream()
+                .map(member -> {
+                    CustomerDtos.CustomerProfile profile = profiles.get(member.getCustomerId());
+                    return new FamilyDtos.GraphNode(
+                            member.getCustomerId(),
+                            profile == null ? null : profile.name(),
+                            profile == null ? null : profile.customerNo(),
+                            profile == null ? null : profile.phoneMasked(),
+                            profile == null ? null : profile.gender(),
+                            profile == null ? null : profile.birthDate(),
+                            member.getRelationshipCode(),
+                            FamilyPolicy.relationshipLabel(member.getRelationshipCode()),
+                            member.isAdmin());
+                })
+                .toList();
+
+        List<FamilyDtos.GraphEdge> edges = new ArrayList<>();
+        for (FamilyDtos.GraphNode from : nodes) {
+            for (FamilyDtos.GraphNode to : nodes) {
+                if (from.customerId().equals(to.customerId())) {
+                    continue;
+                }
+                edges.add(new FamilyDtos.GraphEdge(from.customerId(), to.customerId(),
+                        deriveRelation(from.relationshipCode(), to.relationshipCode(),
+                                from.gender(), to.gender())));
+            }
+        }
+        return new FamilyDtos.FamilyGraph(nodes, edges);
+    }
+
+    /**
+     * 成员关联视图：以指定成员为锚点（"我"），返回其余有效成员相对"我"的称谓
+     * （relationToSelf）与反向称谓（relationFromSelf），并附其余成员之间的两两称谓概览。
+     * 成员关系仅存相对户主（owner/self）的编码，两两称谓经户主中转由 deriveRelation 推导：
+     * 记 X-户主关系 rX、Y-户主关系 rY，则"X 是 Y 的什么"= deriveRelation(rX, rY, genderX, genderY)。
+     * 例如户主配偶(spouse)的孩子(child)：对孩子而言 spouse 是"父亲/母亲"；
+     * 无法推导的组合兜底为"亲属"。锚点成员即使已解除关系也可查询（其余成员仅取有效状态）。
+     */
+    @Transactional(readOnly = true)
+    public FamilyDtos.MemberRelations relations(UUID familyId, UUID memberId) {
+        load(familyId);
+        FamilyMember self = loadMember(familyId, memberId);
+        List<FamilyMember> members =
+                memberRepository.findByFamilyIdAndStatusOrderByAdminDescValidFromAsc(familyId, ACTIVE);
+
+        List<UUID> customerIds = new ArrayList<>();
+        members.forEach(member -> customerIds.add(member.getCustomerId()));
+        if (!customerIds.contains(self.getCustomerId())) {
+            customerIds.add(self.getCustomerId());
+        }
+        Map<UUID, CustomerDtos.CustomerProfile> profiles = customerService.profiles(customerIds);
+
+        CustomerDtos.CustomerProfile selfProfile = profiles.get(self.getCustomerId());
+        FamilyDtos.MemberBrief selfBrief = toBrief(self, selfProfile);
+        String selfRelationship = self.getRelationshipCode();
+        String selfGender = selfProfile == null ? null : selfProfile.gender();
+
+        List<FamilyDtos.MemberBrief> others = members.stream()
+                .filter(member -> !member.getId().equals(memberId))
+                .map(member -> toBrief(member, profiles.get(member.getCustomerId())))
+                .toList();
+
+        List<FamilyDtos.MemberRelationItem> relations = others.stream()
+                .map(other -> new FamilyDtos.MemberRelationItem(other,
+                        deriveRelation(other.relationshipCode(), selfRelationship, other.gender(), selfGender),
+                        deriveRelation(selfRelationship, other.relationshipCode(), selfGender, other.gender())))
+                .toList();
+
+        List<FamilyDtos.PeerRelationItem> peerRelations = new ArrayList<>();
+        for (FamilyDtos.MemberBrief from : others) {
+            for (FamilyDtos.MemberBrief to : others) {
+                if (from.memberId().equals(to.memberId())) {
+                    continue;
+                }
+                peerRelations.add(new FamilyDtos.PeerRelationItem(
+                        from.memberId(), from.name(), to.memberId(), to.name(),
+                        deriveRelation(from.relationshipCode(), to.relationshipCode(),
+                                from.gender(), to.gender())));
+            }
+        }
+        return new FamilyDtos.MemberRelations(selfBrief, relations, peerRelations);
+    }
+
+    /**
      * 查询客户当前有效的家庭归属，供患者360等聚合视图使用。
      * 家庭关系仅表达家庭归属，不代表病历或临床数据授权。
      */
@@ -545,6 +640,21 @@ public class FamilyService {
         );
     }
 
+    private FamilyDtos.MemberBrief toBrief(FamilyMember member, CustomerDtos.CustomerProfile profile) {
+        return new FamilyDtos.MemberBrief(
+                member.getId(),
+                member.getCustomerId(),
+                profile == null ? null : profile.customerNo(),
+                profile == null ? null : profile.name(),
+                profile == null ? null : profile.gender(),
+                profile == null ? null : profile.birthDate(),
+                profile == null ? null : profile.phoneMasked(),
+                member.getRelationshipCode(),
+                FamilyPolicy.relationshipLabel(member.getRelationshipCode()),
+                member.isAdmin()
+        );
+    }
+
     private List<FamilyDtos.AuthorizationItem> mapAuthorizations(List<FamilyAuthorization> authorizations) {
         Map<UUID, CustomerDtos.CustomerBrief> briefs = customerService.briefs(
                 authorizations.stream().map(FamilyAuthorization::getGranteeCustomerId).toList());
@@ -568,5 +678,60 @@ public class FamilyService {
                 authorization.getRevokedAt(),
                 authorization.getCreatedAt()
         );
+    }
+
+    /**
+     * 演示级称谓推导：成员关系均相对户主（owner）存储，记 A--户主关系 rA、B--户主关系 rB，
+     * 经户主中转推导"A 是 B 的什么"。规则不追求医学/谱系精确（如祖/外祖不区分、
+     * 儿媳女婿与妯娌连襟简化），无法推导时兜底"亲属"。
+     */
+    public static String deriveRelation(String rA, String rB, String genderA, String genderB) {
+        String a = rA == null ? "other" : rA;
+        String b = rB == null ? "other" : rB;
+        boolean aMale = "male".equals(genderA);
+        return switch (a) {
+            case "self" -> switch (b) {
+                case "self" -> "本人";
+                case "spouse" -> "配偶";
+                case "child" -> aMale ? "父亲" : "母亲";
+                case "parent" -> aMale ? "儿子" : "女儿";
+                case "sibling" -> aMale ? "兄弟" : "姐妹";
+                case "grandparent" -> aMale ? "孙子" : "孙女";
+                case "grandchild" -> aMale ? "祖父" : "祖母";
+                default -> "亲属";
+            };
+            case "spouse" -> switch (b) {
+                case "self" -> "配偶";
+                case "child" -> aMale ? "父亲" : "母亲";
+                case "parent" -> aMale ? "女婿" : "儿媳";
+                case "grandchild" -> aMale ? "祖父" : "祖母";
+                default -> "亲属";
+            };
+            case "child" -> switch (b) {
+                case "self", "spouse" -> aMale ? "儿子" : "女儿";
+                case "child" -> aMale ? "兄弟" : "姐妹";
+                case "parent" -> aMale ? "孙子" : "孙女";
+                default -> "亲属";
+            };
+            case "sibling" -> switch (b) {
+                case "self" -> aMale ? "兄弟" : "姐妹";
+                default -> "亲属";
+            };
+            case "parent" -> switch (b) {
+                case "self", "child" -> aMale ? "父亲" : "母亲";
+                case "spouse" -> "父母";
+                default -> "亲属";
+            };
+            case "grandparent" -> switch (b) {
+                case "self" -> aMale ? "祖父" : "祖母";
+                case "child" -> "祖孙";
+                default -> "亲属";
+            };
+            case "grandchild" -> switch (b) {
+                case "self" -> aMale ? "孙子" : "孙女";
+                default -> "亲属";
+            };
+            default -> "亲属";
+        };
     }
 }

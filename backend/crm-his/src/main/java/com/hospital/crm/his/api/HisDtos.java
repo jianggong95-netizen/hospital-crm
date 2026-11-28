@@ -107,4 +107,28 @@ public final class HisDtos {
             Long durationMs
     ) {
     }
+
+    /**
+     * HIS 患者全量同步结果：total 本次处理的 HIS 患者数；created 新建客户数；
+     * linked 匹配到现有客户并绑定主索引数；updated 补齐性别/生日数；skipped 已绑定跳过数。
+     */
+    public record SyncResult(
+            int total,
+            int created,
+            int linked,
+            int updated,
+            int skipped
+    ) {
+    }
+
+    /**
+     * HIS 患者全量分页拉取的固定契约：items 为本页脱敏候选，
+     * hasMore 表示仍有后续分页，total 为视图内患者总数。
+     */
+    public record PatientPage(
+            List<PatientCandidate> items,
+            boolean hasMore,
+            int total
+    ) {
+    }
 }

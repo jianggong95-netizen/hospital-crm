@@ -3,6 +3,7 @@ package com.hospital.crm.his.api;
 import com.hospital.crm.common.api.ApiResponse;
 import com.hospital.crm.common.api.PageResponse;
 import com.hospital.crm.his.application.HisPatientService;
+import com.hospital.crm.his.application.HisPatientSyncService;
 import com.hospital.crm.his.application.HisSyncLogService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,10 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class HisController {
 
     private final HisPatientService patientService;
+    private final HisPatientSyncService patientSyncService;
     private final HisSyncLogService syncLogService;
 
-    public HisController(HisPatientService patientService, HisSyncLogService syncLogService) {
+    public HisController(HisPatientService patientService,
+                         HisPatientSyncService patientSyncService,
+                         HisSyncLogService syncLogService) {
         this.patientService = patientService;
+        this.patientSyncService = patientSyncService;
         this.syncLogService = syncLogService;
     }
 
@@ -45,6 +50,12 @@ public class HisController {
     public ApiResponse<HisDtos.LinkResponse> link(@PathVariable String externalPatientId,
                                                   @Valid @RequestBody HisDtos.LinkRequest request) {
         return ApiResponse.ok(patientService.link(externalPatientId, request));
+    }
+
+    @PostMapping("/patients/sync")
+    @PreAuthorize("hasAuthority('his:patient:link')")
+    public ApiResponse<HisDtos.SyncResult> syncPatients() {
+        return ApiResponse.ok(patientSyncService.syncAll());
     }
 
     @GetMapping("/sync-logs")

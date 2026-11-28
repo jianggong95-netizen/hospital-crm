@@ -10,13 +10,23 @@ import {
   fetchAuthorizations,
   fetchFamilies,
   fetchFamily,
+  fetchFamilyGraph,
   fetchFamilyMembers,
+  fetchMemberRelations,
   revokeAuthorization,
   updateFamilyMember
 } from '@/api/families'
 import { fetchCustomers } from '@/api/customers'
 import type { CustomerSummary } from '@/types/customer'
-import type { FamilyAuthorizationItem, FamilyDetail, FamilyMemberItem, FamilySummary } from '@/types/family'
+import type {
+  FamilyAuthorizationItem,
+  FamilyDetail,
+  FamilyGraph,
+  FamilyGraphNode,
+  FamilyMemberItem,
+  FamilyMemberRelations,
+  FamilySummary
+} from '@/types/family'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -88,6 +98,93 @@ const editForm = reactive({
   customerName: '',
   relationshipCode: 'spouse',
   admin: false
+})
+
+// 家庭关系图谱（演示级称谓推导，数据来自 /families/{id}/graph）
+const graphVisible = ref(false)
+const graphLoading = ref(false)
+const graph = ref<FamilyGraph>()
+const graphSelected = ref<FamilyGraphNode>()
+
+const graphRows = computed(() => {
+  const selected = graphSelected.value
+  const data = graph.value
+  if (!selected || !data) return []
+  return data.nodes
+    .filter((node) => node.customerId !== selected.customerId)
+    .map((node) => ({
+      ...node,
+      relationToSelected:
+        data.edges.find(
+          (edge) => edge.fromCustomerId === node.customerId && edge.toCustomerId === selected.customerId
+        )?.label ?? '亲属'
+    }))
+})
+
+async function openGraph(member: FamilyMemberItem) {
+  const family = detail.value
+  if (!family || !member.customer) return
+  graphVisible.value = true
+  graphLoading.value = true
+  graph.value = undefined
+  graphSelected.value = undefined
+  try {
+    const data = await fetchFamilyGraph(family.id)
+    const selected = data.nodes.find((node) => node.customerId === member.customer?.id)
+    if (!selected) {
+      ElMessage.warning('该成员不在当前有效家庭成员中，暂无关系图谱')
+      graphVisible.value = false
+      return
+    }
+    graph.value = data
+    graphSelected.value = selected
+  } catch (error) {
+    graphVisible.value = false
+    ElMessage.error(error instanceof Error ? error.message : '加载关系图谱失败')
+  } finally {
+    graphLoading.value = false
+  }
+}
+
+// 成员关联视图（数据来自 /families/{id}/members/{id}/relations，锚点为所选成员）
+const relationsVisible = ref(false)
+const relationsLoading = ref(false)
+const relations = ref<FamilyMemberRelations>()
+
+async function openRelations(member: FamilyMemberItem) {
+  const family = detail.value
+  if (!family) return
+  relationsVisible.value = true
+  relationsLoading.value = true
+  relations.value = undefined
+  try {
+    relations.value = await fetchMemberRelations(family.id, member.id)
+  } catch (error) {
+    relationsVisible.value = false
+    ElMessage.error(error instanceof Error ? error.message : '加载成员关联失败')
+  } finally {
+    relationsLoading.value = false
+  }
+}
+
+// peerRelations 每对成员双向两条，合并成一条“互称”摘要展示
+const peerPairs = computed(() => {
+  const data = relations.value
+  if (!data) return []
+  const map = new Map<string, { key: string; lines: string[] }>()
+  for (const item of data.peerRelations) {
+    const key = item.fromMemberId < item.toMemberId
+      ? `${item.fromMemberId}|${item.toMemberId}`
+      : `${item.toMemberId}|${item.fromMemberId}`
+    const line = `${item.fromName} 是 ${item.toName} 的${item.label}`
+    const pair = map.get(key)
+    if (pair) {
+      pair.lines.push(line)
+    } else {
+      map.set(key, { key, lines: [line] })
+    }
+  }
+  return Array.from(map.values())
 })
 
 const authMemberId = ref('')
@@ -695,9 +792,18 @@ onMounted(load)
                     <span class="cell-muted">{{ formatDate(row.validTo) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column v-if="canWrite" label="操作" width="170" fixed="right">
+                <el-table-column label="操作" width="280" fixed="right">
                   <template #default="{ row }">
-                    <template v-if="row.status === 'active'">
+                    <el-button link type="primary" @click="openGraph(row)">关系图</el-button>
+                    <el-button
+                      v-if="row.status === 'active' && row.customer"
+                      link
+                      type="primary"
+                      @click="openRelations(row)"
+                    >
+                      查看关联
+                    </el-button>
+                    <template v-if="canWrite && row.status === 'active'">
                       <el-button link type="primary" @click="openEditMember(row)">编辑</el-button>
                       <el-button
                         v-if="!row.admin"
@@ -711,7 +817,7 @@ onMounted(load)
                         解除
                       </el-button>
                     </template>
-                    <span v-else class="cell-muted">历史关系</span>
+                    <span v-else-if="row.status !== 'active'" class="cell-muted">历史关系</span>
                   </template>
                 </el-table-column>
               </el-table>
@@ -809,6 +915,101 @@ onMounted(load)
         </template>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="graphVisible" title="家庭关系图谱" width="640px" append-to-body>
+      <div v-loading="graphLoading">
+        <template v-if="graphSelected">
+          <div class="graph-hero">
+            <div>
+              <h4>
+                {{ graphSelected.name || '—' }}
+                <el-tag v-if="graphSelected.admin" size="small" type="warning" effect="plain">
+                  家庭管理员 / 户主
+                </el-tag>
+              </h4>
+              <p class="meta-line">
+                <span class="cell-mono">{{ graphSelected.customerNo || '—' }}</span>
+                · 与户主关系：{{ graphSelected.relationshipLabel }}
+                · <span class="cell-mono">{{ graphSelected.phoneMasked || '—' }}</span>
+              </p>
+            </div>
+          </div>
+          <el-table :data="graphRows" row-key="customerId" size="small" stripe>
+            <el-table-column label="姓名" min-width="150">
+              <template #default="{ row }">
+                <div>{{ row.name || '—' }}</div>
+                <span class="cell-mono cell-muted">{{ row.customerNo || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="relationshipLabel" label="与户主关系" width="130" />
+            <el-table-column label="与该成员关系" min-width="140">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain">{{ row.relationToSelected }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <p class="form-tip">称谓由户主关系演示级推导，仅供参考，不代表医学或法律亲属关系。</p>
+        </template>
+      </div>
+    </el-dialog>
+
+    <el-drawer v-model="relationsVisible" title="成员关联称谓" size="560px" append-to-body>
+      <div v-loading="relationsLoading">
+        <template v-if="relations">
+          <div class="rel-self-card">
+            <div class="rel-self-head">
+              <h4>
+                {{ relations.self.name }}
+                <el-tag v-if="relations.self.admin" size="small" type="warning" effect="plain">
+                  家庭管理员 / 户主
+                </el-tag>
+              </h4>
+              <span class="badge" :class="relations.self.gender === 'female' ? 'badge-neutral' : 'badge-success'">
+                {{ relations.self.gender === 'male' ? '男' : relations.self.gender === 'female' ? '女' : '未知' }}
+              </span>
+            </div>
+            <p class="meta-line">
+              <span class="cell-mono">{{ relations.self.customerNo }}</span>
+              · 生日 {{ relations.self.birthDate || '—' }}
+              · 与户主关系：{{ relations.self.relationshipLabel }}
+              · <span class="cell-mono">{{ relations.self.phoneMasked || '—' }}</span>
+            </p>
+          </div>
+
+          <h4 class="detail-title">其他成员与所选成员的关联</h4>
+          <el-table :data="relations.relations" size="small" stripe empty-text="暂无其他有效成员">
+            <el-table-column label="姓名" min-width="110">
+              <template #default="{ row }">
+                <div>{{ row.member.name || '—' }}</div>
+                <span class="cell-mono cell-muted">{{ row.member.customerNo || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="与所选成员关系" min-width="120">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain">{{ row.relationToSelf }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="反向称谓" min-width="120">
+              <template #default="{ row }">
+                <el-tag size="small" type="info" effect="plain">{{ row.relationFromSelf }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="手机号" width="120">
+              <template #default="{ row }">
+                <span class="cell-mono">{{ row.member.phoneMasked || '—' }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <h4 class="detail-title">成员间关系</h4>
+          <p v-if="!peerPairs.length" class="cell-muted">暂无其他成员间关系</p>
+          <ul v-else class="peer-list">
+            <li v-for="pair in peerPairs" :key="pair.key">{{ pair.lines.join('；') }}</li>
+          </ul>
+          <p class="form-tip">称谓由户主关系演示级推导，选中任意成员即可查看其与其他成员的互称。</p>
+        </template>
+      </div>
+    </el-drawer>
   </section>
 </template>
 
@@ -857,5 +1058,39 @@ onMounted(load)
 .badge-muted {
   background: #eef1f5;
   color: #6b7a90;
+}
+
+.rel-self-card {
+  padding: 14px 16px;
+  border: 1px solid var(--crm-border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.rel-self-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rel-self-head h4 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rel-self-card .meta-line {
+  margin: 8px 0 0;
+}
+
+.peer-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--crm-ink-soft);
+  font-size: 13px;
+  line-height: 2;
 }
 </style>

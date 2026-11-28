@@ -88,3 +88,59 @@ export interface DelegationCheckPayload {
   granteeCustomerId: string
   scopeCode: string
 }
+
+export interface FamilyGraphNode {
+  customerId: string
+  name?: string
+  customerNo?: string
+  phoneMasked?: string
+  gender?: string
+  birthDate?: string
+  relationshipCode: string
+  relationshipLabel: string
+  admin: boolean
+}
+
+export interface FamilyGraphEdge {
+  fromCustomerId: string
+  toCustomerId: string
+  label: string
+}
+
+export interface FamilyGraph {
+  nodes: FamilyGraphNode[]
+  edges: FamilyGraphEdge[]
+}
+
+export interface FamilyMemberBrief {
+  memberId: string
+  customerId: string
+  customerNo: string
+  name: string
+  gender?: string
+  birthDate?: string
+  phoneMasked?: string
+  relationshipCode: string
+  relationshipLabel: string
+  admin: boolean
+}
+
+export interface FamilyMemberRelationItem {
+  member: FamilyMemberBrief
+  relationToSelf: string
+  relationFromSelf: string
+}
+
+export interface FamilyPeerRelationItem {
+  fromMemberId: string
+  fromName: string
+  toMemberId: string
+  toName: string
+  label: string
+}
+
+export interface FamilyMemberRelations {
+  self: FamilyMemberBrief
+  relations: FamilyMemberRelationItem[]
+  peerRelations: FamilyPeerRelationItem[]
+}

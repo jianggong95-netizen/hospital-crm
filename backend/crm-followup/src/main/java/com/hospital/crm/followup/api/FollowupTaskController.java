@@ -2,6 +2,7 @@ package com.hospital.crm.followup.api;
 
 import com.hospital.crm.common.api.ApiResponse;
 import com.hospital.crm.common.api.PageResponse;
+import com.hospital.crm.followup.application.FollowupHisEventService;
 import com.hospital.crm.followup.application.FollowupTaskService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -25,9 +27,12 @@ import java.util.UUID;
 public class FollowupTaskController {
 
     private final FollowupTaskService taskService;
+    private final FollowupHisEventService hisEventService;
 
-    public FollowupTaskController(FollowupTaskService taskService) {
+    public FollowupTaskController(FollowupTaskService taskService,
+                                  FollowupHisEventService hisEventService) {
         this.taskService = taskService;
+        this.hisEventService = hisEventService;
     }
 
     @GetMapping("/tasks")
@@ -40,12 +45,25 @@ public class FollowupTaskController {
             @RequestParam(required = false) UUID assigneeId,
             @RequestParam(required = false) UUID customerId,
             @RequestParam(required = false) Boolean escalationRequired,
+            @RequestParam(required = false) Boolean overdue,
             @RequestParam(required = false) LocalDate dateFrom,
             @RequestParam(required = false) LocalDate dateTo,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         return ApiResponse.ok(taskService.list(keyword, status, categoryCode, riskLevel, assigneeId,
-                customerId, escalationRequired, dateFrom, dateTo, page, pageSize));
+                customerId, escalationRequired, overdue, dateFrom, dateTo, page, pageSize));
+    }
+
+    /**
+     * 随访统计：全局计数 + 五大回访板块明细。
+     * visitType 过滤板块明细行；groupBy=visitType（默认）按板块聚合，=category 按板块下自定义分类聚合。
+     */
+    @GetMapping("/stats")
+    @PreAuthorize("hasAuthority('crm:followup:read')")
+    public ApiResponse<FollowupDtos.StatsView> stats(
+            @RequestParam(required = false) String visitType,
+            @RequestParam(required = false) String groupBy) {
+        return ApiResponse.ok(taskService.stats(visitType, groupBy));
     }
 
     @PostMapping("/tasks")
@@ -113,5 +131,34 @@ public class FollowupTaskController {
             @PathVariable UUID taskId,
             @Valid @RequestBody FollowupDtos.ReasonRequest request) {
         return ApiResponse.ok(taskService.cancel(taskId, request));
+    }
+
+    // ------------------------------------------------------------------
+    // HIS 事件对接（接口预留：HIS/集成平台推送就诊、出院、手术、体检报告事件）
+    // ------------------------------------------------------------------
+    /**
+     * HIS 事件目录：事件类型 → 回访板块 → 默认分类/推荐计划/必备字段，
+     * 供 HIS 对接配置页与"视图需求"文档使用。
+     */
+    @GetMapping("/his-event-catalog")
+    @PreAuthorize("hasAuthority('crm:followup:read')")
+    public ApiResponse<List<FollowupDtos.HisEventCatalogItem>> hisEventCatalog() {
+        return ApiResponse.ok(hisEventService.catalog());
+    }
+
+    @PostMapping("/his/events")
+    @PreAuthorize("hasAuthority('crm:followup:write')")
+    public ApiResponse<FollowupDtos.HisEventView> receiveHisEvent(
+            @Valid @RequestBody FollowupDtos.HisEventRequest request) {
+        return ApiResponse.ok(hisEventService.receive(request));
+    }
+
+    @GetMapping("/his/events")
+    @PreAuthorize("hasAuthority('crm:followup:read')")
+    public ApiResponse<PageResponse<FollowupDtos.HisEventView>> listHisEvents(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(hisEventService.list(status, page, pageSize));
     }
 }
